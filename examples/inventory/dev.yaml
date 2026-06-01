@@ -1,0 +1,53 @@
+version: 1
+hosts:
+  - name: devbox
+    quadlet_root: ~/.config/containers/systemd
+instances:
+  - name: openclaw-dev
+    host: devbox
+    service_scope: user
+    quadlet_path: openclaw-dev.container
+    container_name: openclaw-dev
+    image:
+      repository: ghcr.io/openclaw/gateway
+      tag: "0.14.0"
+      digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+      known_good_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+    ports:
+      - bind_address: 127.0.0.1
+        host_port: 9011
+        container_port: 8080
+        protocol: tcp
+    mounts:
+      - source: /srv/openclaw/dev/workspace
+        target: /workspace
+        read_only: false
+      - source: /srv/openclaw/dev/config
+        target: /app/config
+        read_only: false
+    env_files:
+      - /srv/openclaw/dev/.env
+    labels:
+      env: dev
+      team: edge
+    public_url: http://localhost:9011
+    health:
+      path: /health
+      interval_seconds: 30
+      timeout_seconds: 5
+      retries: 3
+    update_policy:
+      channel: stable
+      strategy: manual
+      auto_apply: false
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 5
+      paths:
+        - /srv/openclaw/dev/workspace
+        - /srv/openclaw/dev/config
+    dashboard:
+      friendly_name: OpenClaw Dev
+      owner: Edge Team
+      tags: [dev, internal]

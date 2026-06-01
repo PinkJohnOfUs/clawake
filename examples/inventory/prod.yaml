@@ -1,0 +1,55 @@
+version: 1
+hosts:
+  - name: prod-a
+    quadlet_root: ~/.config/containers/systemd
+    ssh_target: ops@prod-a
+instances:
+  - name: openclaw-prod
+    host: prod-a
+    service_scope: user
+    quadlet_path: openclaw-prod.container
+    container_name: openclaw-prod
+    image:
+      repository: ghcr.io/openclaw/gateway
+      tag: "0.14.0"
+      digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+      known_good_digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+    ports:
+      - bind_address: 0.0.0.0
+        host_port: 9010
+        container_port: 8080
+        protocol: tcp
+    mounts:
+      - source: /srv/openclaw/prod/workspace
+        target: /workspace
+        read_only: false
+      - source: /srv/openclaw/prod/config
+        target: /app/config
+        read_only: false
+    env_files:
+      - /srv/openclaw/prod/.env
+    labels:
+      env: prod
+      criticality: high
+    public_url: https://openclaw.example.com
+    health:
+      path: /health
+      interval_seconds: 15
+      timeout_seconds: 5
+      retries: 5
+    update_policy:
+      channel: stable
+      strategy: controlled
+      auto_apply: false
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 10
+      paths:
+        - /srv/openclaw/prod/workspace
+        - /srv/openclaw/prod/config
+    dashboard:
+      friendly_name: OpenClaw Production
+      owner: Operations
+      description: Customer-facing production instance
+      tags: [prod, customer]
