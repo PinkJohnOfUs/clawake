@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import difflib
+import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
 from clawake.config import InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance
 from clawake.services.render import render_instance, render_inventory
-from clawake.services.systemd import SystemdService
+from clawake.services.systemd import CommandResult, SystemdService
 from clawake.services.upgrade import (
     apply_upgrade,
     backup_config,
@@ -30,6 +31,7 @@ ExecuteFlag = Annotated[bool, typer.Option("--execute")]
 InstanceName = Annotated[str, typer.Option(..., "--instance", "-i")]
 TagValue = Annotated[str | None, typer.Option("--tag")]
 DigestValue = Annotated[str | None, typer.Option("--digest")]
+StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
 
 
 def _load(path: Path) -> Inventory:
@@ -47,11 +49,27 @@ def _instance_by_name(inventory: Inventory, name: str) -> InstanceSpec:
     raise typer.BadParameter(f"Unknown instance '{name}'")
 
 
+def _print_result(result: CommandResult) -> None:
+    typer.echo(f"$ {' '.join(result.command)}")
+    if result.stdout:
+        typer.echo(result.stdout)
+    if result.stderr:
+        typer.echo(result.stderr)
+
+
+def _status_state(result: CommandResult, execute: bool) -> str:
+    if not execute:
+        return "dry_run"
+    if result.return_code == 0:
+        return "healthy"
+    return "failed"
+
+
 @app.command()
 def validate(config: ConfigPath) -> None:
     """Validate inventory configuration."""
-    _load(config)
-    typer.echo(f"OK: {config} is valid")
+    inventory = _load(config)
+    typer.echo(f"OK: {config} is valid for cluster '{inventory.cluster.name}'")
 
 
 @app.command()
@@ -108,15 +126,78 @@ def deploy(config: ConfigPath, target: TargetPath, execute: ExecuteFlag = False)
 
 
 @app.command()
+def apply(
+    config: ConfigPath,
+    target: TargetPath,
+    output: OutputPath = Path(".rendered"),
+    execute: ExecuteFlag = False,
+) -> None:
+    """Validate, render, deploy and reconcile changed services."""
+    inventory = _load(config)
+    rendered = render_inventory(inventory, output_dir=output, template_root=_template_root())
+
+    changed: list[tuple[InstanceSpec, Path, Path]] = []
+    by_quadlet = {instance.quadlet_path: instance for instance in inventory.instances}
+
+    for rendered_file in rendered:
+        instance = by_quadlet[rendered_file.relative_to(output).as_posix()]
+        destination = target.expanduser() / rendered_file.relative_to(output)
+        current_text = destination.read_text(encoding="utf-8") if destination.exists() else ""
+        rendered_text = rendered_file.read_text(encoding="utf-8")
+        if current_text != rendered_text:
+            changed.append((instance, rendered_file, destination))
+
+    typer.echo(
+        f"Apply plan for cluster '{inventory.cluster.name}' ({inventory.cluster.mode}): "
+        f"{len(changed)}/{len(inventory.instances)} instance(s) changed"
+    )
+
+    for instance, rendered_file, destination in changed:
+        typer.echo(
+            f" - {instance.name} [{instance.role}/{instance.profile}] "
+            f"{rendered_file} -> {destination}"
+        )
+
+    if not execute:
+        for instance, _, _ in changed:
+            if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
+                archive = backup_instance(instance, output_dir=Path(".backups/instances"), execute=False)
+                typer.echo(f"DRY RUN backup plan for {instance.name}: {archive}")
+        typer.echo("DRY RUN apply complete. Re-run with --execute to mutate state.")
+        return
+
+    service = SystemdService()
+    failed = False
+
+    for instance, rendered_file, destination in changed:
+        if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
+            archive = backup_instance(instance, output_dir=Path(".backups/instances"), execute=True)
+            typer.echo(f"Backup created for {instance.name}: {archive}")
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(rendered_file, destination)
+        typer.echo(f"Deployed {rendered_file} -> {destination}")
+
+    if changed:
+        reload_result = service.daemon_reload(execute=True)
+        _print_result(reload_result)
+        failed = failed or reload_result.return_code != 0
+
+        for instance, _, _ in changed:
+            restart_result = service.restart(instance.name, execute=True)
+            _print_result(restart_result)
+            failed = failed or restart_result.return_code != 0
+
+    if failed:
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def restart(instance: str, execute: ExecuteFlag = False) -> None:
     """Reload/restart a systemd user service."""
     service = SystemdService()
     result = service.restart(instance, execute=execute)
-    typer.echo(f"$ {' '.join(result.command)}")
-    if result.stdout:
-        typer.echo(result.stdout)
-    if result.stderr:
-        typer.echo(result.stderr)
+    _print_result(result)
 
 
 @app.command()
@@ -124,11 +205,55 @@ def status(instance: str, execute: ExecuteFlag = False) -> None:
     """Inspect status for a service."""
     service = SystemdService()
     result = service.status(instance, execute=execute)
-    typer.echo(f"$ {' '.join(result.command)}")
-    if result.stdout:
-        typer.echo(result.stdout)
-    if result.stderr:
-        typer.echo(result.stderr)
+    _print_result(result)
+
+
+@app.command("status-cluster")
+def status_cluster(
+    config: ConfigPath,
+    execute: ExecuteFlag = False,
+    format: StatusFormat = "text",
+) -> None:
+    """Inspect status for all services in a cluster."""
+    inventory = _load(config)
+    service = SystemdService()
+    rows: list[dict[str, object]] = []
+
+    for instance in inventory.instances:
+        result = service.status(instance.name, execute=execute)
+        row = {
+            "instance": instance.name,
+            "role": instance.role,
+            "profile": instance.profile,
+            "state": _status_state(result, execute),
+            "return_code": result.return_code,
+            "unit": service.unit_name(instance.name),
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+        rows.append(row)
+
+    if format == "json":
+        typer.echo(
+            json.dumps(
+                {
+                    "cluster": inventory.cluster.name,
+                    "mode": inventory.cluster.mode,
+                    "instances": rows,
+                },
+                indent=2,
+            )
+        )
+    else:
+        typer.echo(f"Cluster: {inventory.cluster.name} ({inventory.cluster.mode})")
+        for row in rows:
+            typer.echo(
+                f"- {row['instance']} [{row['role']}/{row['profile']}] "
+                f"state={row['state']} rc={row['return_code']}"
+            )
+
+    if execute and any(int(row["return_code"]) != 0 for row in rows):
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -140,11 +265,7 @@ def logs(
     """Collect logs for a service."""
     service = SystemdService()
     result = service.logs(instance, lines=lines, execute=execute)
-    typer.echo(f"$ {' '.join(result.command)}")
-    if result.stdout:
-        typer.echo(result.stdout)
-    if result.stderr:
-        typer.echo(result.stderr)
+    _print_result(result)
 
 
 @app.command()
@@ -154,7 +275,7 @@ def backup(
     output: OutputPath = Path(".backups"),
     execute: ExecuteFlag = False,
 ) -> None:
-    """Backup workspace/config mounts for an instance."""
+    """Backup workspace/config/state for an instance."""
     inventory = _load(config)
     chosen = _instance_by_name(inventory, instance)
     archive = backup_instance(chosen, output_dir=output, execute=execute)
@@ -173,11 +294,22 @@ def upgrade(
     execute: ExecuteFlag = False,
 ) -> None:
     """Perform a controlled upgrade by changing target image tag/digest."""
+    inventory = _load(config)
+    chosen = _instance_by_name(inventory, instance)
+
     plan = build_upgrade_plan(config, instance, next_tag=tag, next_digest=digest)
     typer.echo(
         f"Upgrade plan for {plan.instance}: "
         f"{plan.previous_tag}@{plan.previous_digest} -> {plan.next_tag}@{plan.next_digest}"
     )
+
+    if chosen.backup_policy.enabled and chosen.backup_policy.pre_mutation:
+        instance_backup = backup_instance(chosen, output_dir=Path(".backups/instances"), execute=execute)
+        if execute:
+            typer.echo(f"Instance backup created: {instance_backup}")
+        else:
+            typer.echo(f"DRY RUN instance backup would create: {instance_backup}")
+
     if not execute:
         typer.echo("DRY RUN: no config changes written")
         return
@@ -195,6 +327,16 @@ def rollback(
     execute: ExecuteFlag = False,
 ) -> None:
     """Rollback an instance digest to known-good."""
+    inventory = _load(config)
+    chosen = _instance_by_name(inventory, instance)
+
+    if chosen.backup_policy.enabled and chosen.backup_policy.pre_mutation:
+        instance_backup = backup_instance(chosen, output_dir=Path(".backups/instances"), execute=execute)
+        if execute:
+            typer.echo(f"Instance backup created: {instance_backup}")
+        else:
+            typer.echo(f"DRY RUN instance backup would create: {instance_backup}")
+
     if not execute:
         typer.echo("DRY RUN rollback requires --execute to mutate config")
         return

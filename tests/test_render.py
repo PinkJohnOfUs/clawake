@@ -10,5 +10,10 @@ def test_render_contains_expected_container_data() -> None:
         inventory.instances[0],
         template_root=Path("templates"),
     )
-    assert "ContainerName=openclaw-dev" in rendered
+    assert "ContainerName=openclaw-product-owner" in rendered
     assert "Image=ghcr.io/openclaw/gateway:0.14.0@sha256:" in rendered
+    assert "Label=clawake.role=product_owner" in rendered
+    assert "Label=clawake.profile=public" in rendered
+    assert "Volume=/srv/openclaw/product_owner/workspace:/workspace" in rendered
+    assert "Volume=/srv/openclaw/product_owner/config:/app/config" in rendered
+    assert "Volume=/srv/openclaw/product_owner/state:/state" in rendered
