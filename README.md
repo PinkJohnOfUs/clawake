@@ -141,3 +141,14 @@ License recommendation: **MIT** (already included in `LICENSE`) because this is 
 - [ ] Add FastAPI read-only dashboard prototype.
 - [ ] Add role-based controls for mutating actions.
 - [ ] Add remote SSH execution adapter.
+
+## Development
+
+This repository uses `uv` for dependency management and local tooling.
+
+```bash
+uv sync --dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+```
