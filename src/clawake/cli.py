@@ -161,7 +161,11 @@ def apply(
     if not execute:
         for instance, _, _ in changed:
             if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
-                archive = backup_instance(instance, output_dir=Path(".backups/instances"), execute=False)
+                archive = backup_instance(
+                    instance,
+                    output_dir=Path(".backups/instances"),
+                    execute=False,
+                )
                 typer.echo(f"DRY RUN backup plan for {instance.name}: {archive}")
         typer.echo("DRY RUN apply complete. Re-run with --execute to mutate state.")
         return
@@ -304,7 +308,11 @@ def upgrade(
     )
 
     if chosen.backup_policy.enabled and chosen.backup_policy.pre_mutation:
-        instance_backup = backup_instance(chosen, output_dir=Path(".backups/instances"), execute=execute)
+        instance_backup = backup_instance(
+            chosen,
+            output_dir=Path(".backups/instances"),
+            execute=execute,
+        )
         if execute:
             typer.echo(f"Instance backup created: {instance_backup}")
         else:
@@ -331,7 +339,11 @@ def rollback(
     chosen = _instance_by_name(inventory, instance)
 
     if chosen.backup_policy.enabled and chosen.backup_policy.pre_mutation:
-        instance_backup = backup_instance(chosen, output_dir=Path(".backups/instances"), execute=execute)
+        instance_backup = backup_instance(
+            chosen,
+            output_dir=Path(".backups/instances"),
+            execute=execute,
+        )
         if execute:
             typer.echo(f"Instance backup created: {instance_backup}")
         else:
