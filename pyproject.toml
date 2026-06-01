@@ -1,13 +1,50 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "clawake"
 version = "0.1.0"
-description = "The sewer system beneath the bowls on which the agents are sitting"
+description = "OpenClaw operations toolkit for rootless Podman + Quadlet"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "edge-robot" }]
+dependencies = [
+  "typer>=0.12,<1.0",
+  "pydantic>=2.8,<3.0",
+  "PyYAML>=6.0,<7.0",
+  "Jinja2>=3.1,<4.0",
+]
+
+[project.optional-dependencies]
+web = [
+  "fastapi>=0.112,<1.0",
+  "uvicorn>=0.30,<1.0",
+  "jinja2>=3.1,<4.0",
+]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.0",
-    "ruff>=0.12.0",
+  "pytest>=8.4.0",
+  "ruff>=0.12.0",
 ]
+
+[project.scripts]
+clawake = "clawake.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

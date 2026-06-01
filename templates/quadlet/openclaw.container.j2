@@ -1,0 +1,28 @@
+[Unit]
+Description=OpenClaw instance {{ instance.name }}
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName={{ instance.container_name }}
+Image={{ image_ref }}
+{% for env_file in instance.env_files %}
+EnvironmentFile={{ env_file }}
+{% endfor %}
+{% for mount in instance.mounts %}
+Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
+{% endfor %}
+{% for port in instance.ports %}
+PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
+{% endfor %}
+Label=clawake.instance={{ instance.name }}
+{% for key, value in instance.labels.items() %}
+Label={{ key }}={{ value }}
+{% endfor %}
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target
