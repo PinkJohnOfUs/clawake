@@ -1,0 +1,13 @@
+[project]
+name = "clawake"
+version = "0.1.0"
+description = "The sewer system beneath the bowls on which the agents are sitting"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "ruff>=0.12.0",
+]
