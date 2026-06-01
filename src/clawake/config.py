@@ -102,14 +102,14 @@ class Inventory(BaseModel):
             instance_names.add(instance.name)
 
             for port in instance.ports:
-                key = (instance.host, port.bind_address, port.host_port)
-                if key in used_ports:
+                port_key = (instance.host, port.bind_address, port.host_port, port.protocol)
+                if port_key in used_ports:
                     raise ValueError(
                         f"Port collision on host {instance.host} "
                         f"{port.bind_address}:{port.host_port} "
-                        f"between {used_ports[key]} and {instance.name}"
+                        f"between {used_ports[port_key]} and {instance.name}"
                     )
-                used_ports[key] = instance.name
+                used_ports[port_key] = instance.name
 
         return self
 

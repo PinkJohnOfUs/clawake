@@ -50,4 +50,5 @@ instances:
     dashboard:
       friendly_name: OpenClaw Dev
       owner: Edge Team
+      description: Developer sandbox instance
       tags: [dev, internal]

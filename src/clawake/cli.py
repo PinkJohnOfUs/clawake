@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from clawake.config import Inventory, load_inventory
+from clawake.config import InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance
 from clawake.services.render import render_instance, render_inventory
 from clawake.services.systemd import SystemdService
@@ -40,7 +40,7 @@ def _template_root() -> Path:
     return Path(__file__).resolve().parents[2] / "templates"
 
 
-def _instance_by_name(inventory: Inventory, name: str):
+def _instance_by_name(inventory: Inventory, name: str) -> InstanceSpec:
     for instance in inventory.instances:
         if instance.name == name:
             return instance
@@ -98,7 +98,7 @@ def deploy(config: ConfigPath, target: TargetPath, execute: ExecuteFlag = False)
     rendered = render_inventory(inventory, output_dir=rendered_dir, template_root=_template_root())
 
     for rendered_file in rendered:
-        destination = target.expanduser() / rendered_file.name
+        destination = target.expanduser() / rendered_file.relative_to(rendered_dir)
         if execute:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(rendered_file, destination)

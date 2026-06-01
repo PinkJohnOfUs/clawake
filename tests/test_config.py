@@ -40,3 +40,35 @@ instances:
 
     with pytest.raises(ValueError):
         load_inventory(collision)
+
+
+def test_tcp_udp_same_port_allowed(tmp_path: Path) -> None:
+    cfg = tmp_path / "mixed-protocol.yaml"
+    cfg.write_text(
+        """
+version: 1
+hosts:
+  - name: a
+instances:
+  - name: one
+    host: a
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: ghcr.io/x, tag: "1"}
+    dashboard: {friendly_name: One}
+    ports:
+      - {bind_address: 127.0.0.1, host_port: 9010, container_port: 8080, protocol: tcp}
+  - name: two
+    host: a
+    quadlet_path: two.container
+    container_name: two
+    image: {repository: ghcr.io/x, tag: "1"}
+    dashboard: {friendly_name: Two}
+    ports:
+      - {bind_address: 127.0.0.1, host_port: 9010, container_port: 8080, protocol: udp}
+""",
+        encoding="utf-8",
+    )
+
+    inventory = load_inventory(cfg)
+    assert len(inventory.instances) == 2

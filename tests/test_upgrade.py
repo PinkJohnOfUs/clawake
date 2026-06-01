@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from clawake.services.upgrade import apply_upgrade, build_upgrade_plan, rollback_to_known_good
 
 
@@ -23,3 +25,9 @@ def test_apply_upgrade_and_rollback(tmp_path: Path) -> None:
     rolled = rollback_to_known_good(config, "openclaw-dev")
     assert rolled.previous_digest == "sha256:new"
     assert rolled.next_digest.startswith("sha256:111111")
+
+
+def test_upgrade_plan_unknown_instance_raises() -> None:
+    config = Path("examples/inventory/dev.yaml")
+    with pytest.raises(ValueError):
+        build_upgrade_plan(config, "missing", next_tag=None, next_digest=None)

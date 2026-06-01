@@ -16,9 +16,10 @@ def backup_instance(instance: InstanceSpec, output_dir: Path, execute: bool = Fa
         return archive_path
 
     with tarfile.open(archive_path, "w:gz") as archive:
-        for mount in instance.mounts:
+        for idx, mount in enumerate(instance.mounts, start=1):
             source = Path(mount.source).expanduser()
             if source.exists():
-                archive.add(source, arcname=source.name)
+                mount_identifier = mount.target.strip("/").replace("/", "__") or source.name
+                archive.add(source, arcname=f"{idx:02d}__{mount_identifier}__{source.name}")
 
     return archive_path

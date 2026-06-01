@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass
 
@@ -12,9 +13,14 @@ class CommandResult:
     stderr: str
 
 
+_UNIT_SAFE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.@-]+$")
+
+
 class SystemdService:
     @staticmethod
     def unit_name(instance_name: str) -> str:
+        if not _UNIT_SAFE_NAME_PATTERN.fullmatch(instance_name):
+            raise ValueError("Instance name contains unsupported characters")
         return f"{instance_name}.service"
 
     def _run(self, command: list[str], execute: bool) -> CommandResult:
