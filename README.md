@@ -1,14 +1,12 @@
 # clawake
 
-The sewer system beneath the bowls on which the agents are sitting.
+The sewer system beneath the bowls on which the agents are sitting. Effectively the sandbox for the agents, designed to contain all waste and prevent the cat from shitting in your house.
 
 `clawake` is a Python-first operations toolkit for managing one or more OpenClaw deployments running in rootless Podman containers through Quadlet and systemd user services.
 
 Operational defaults:
 - Safe by default (`dry-run` first, explicit `--execute` for mutations).
 - Inventory-driven configuration (`-c/--config` YAML file).
-
-General architecture, roadmap, and operational notes were moved to `docs/`.
 
 ## CLI Reference
 
@@ -45,6 +43,8 @@ General architecture, roadmap, and operational notes were moved to `docs/`.
 - `--lines`: journal line count for `logs` (default: `100`).
 
 ## Documentation
+
+Please find general architecture, roadmap, and operational notes in`docs/`.
 
 - Architecture: `docs/architecture.md`
 - Roadmap: `docs/repo-roadmap.md`
