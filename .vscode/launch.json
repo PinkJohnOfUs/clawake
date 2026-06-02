@@ -1,0 +1,108 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Clawake: validate (dev)",
+      "type": "python",
+      "request": "launch",
+      "module": "clawake.cli",
+      "args": [
+        "validate",
+        "--config",
+        "examples/inventory/dev.yaml"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "preLaunchTask": "uv: sync"
+    },
+    {
+      "name": "Clawake: render (dev)",
+      "type": "python",
+      "request": "launch",
+      "module": "clawake.cli",
+      "args": [
+        "render",
+        "--config",
+        "examples/inventory/dev.yaml",
+        "--output",
+        ".rendered"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "preLaunchTask": "uv: sync"
+    },
+    {
+      "name": "Clawake: plan (dev)",
+      "type": "python",
+      "request": "launch",
+      "module": "clawake.cli",
+      "args": [
+        "plan",
+        "--config",
+        "examples/inventory/dev.yaml",
+        "--output",
+        ".rendered"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "preLaunchTask": "uv: sync"
+    },
+    {
+      "name": "Clawake: status-cluster (dry run)",
+      "type": "python",
+      "request": "launch",
+      "module": "clawake.cli",
+      "args": [
+        "status-cluster",
+        "--config",
+        "examples/inventory/dev.yaml",
+        "--format",
+        "json"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "preLaunchTask": "uv: sync"
+    },
+    {
+      "name": "Clawake: apply (dry run)",
+      "type": "python",
+      "request": "launch",
+      "module": "clawake.cli",
+      "args": [
+        "apply",
+        "--config",
+        "examples/inventory/dev.yaml",
+        "--target",
+        "${env:HOME}/.config/containers/systemd"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "preLaunchTask": "uv: sync"
+    }
+  ]
+}
