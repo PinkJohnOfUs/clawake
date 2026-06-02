@@ -2,33 +2,34 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Clawake: validate (dev)",
+      "name": "Clawake: validate (product)",
       "type": "python",
       "request": "launch",
       "module": "clawake.cli",
       "args": [
         "validate",
         "--config",
-        "examples/inventory/dev.yaml"
+        "examples/staff/product.yml"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
+        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
       "preLaunchTask": "uv: sync"
     },
     {
-      "name": "Clawake: render (dev)",
+      "name": "Clawake: render (product)",
       "type": "python",
       "request": "launch",
       "module": "clawake.cli",
       "args": [
         "render",
         "--config",
-        "examples/inventory/dev.yaml",
+        "examples/staff/product.yml",
         "--output",
         ".rendered"
       ],
@@ -36,20 +37,21 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
+        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
       "preLaunchTask": "uv: sync"
     },
     {
-      "name": "Clawake: plan (dev)",
+      "name": "Clawake: plan (product)",
       "type": "python",
       "request": "launch",
       "module": "clawake.cli",
       "args": [
         "plan",
         "--config",
-        "examples/inventory/dev.yaml",
+        "examples/staff/product.yml",
         "--output",
         ".rendered"
       ],
@@ -57,6 +59,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
+        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
@@ -70,7 +73,7 @@
       "args": [
         "status-cluster",
         "--config",
-        "examples/inventory/dev.yaml",
+        "examples/staff/product.yml",
         "--format",
         "json"
       ],
@@ -78,6 +81,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
+        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
@@ -91,7 +95,7 @@
       "args": [
         "apply",
         "--config",
-        "examples/inventory/dev.yaml",
+        "examples/staff/product.yml",
         "--target",
         "${env:HOME}/.config/containers/systemd"
       ],
@@ -99,6 +103,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
+        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },

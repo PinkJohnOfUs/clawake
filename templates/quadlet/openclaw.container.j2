@@ -18,6 +18,9 @@ Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' 
 {% for port in instance.ports %}
 PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
 {% endfor %}
+{% if instance.gateway_runtime.enabled %}
+Exec=node dist/index.js gateway --bind {{ instance.gateway_runtime.bind }} --port {{ instance.gateway_runtime.gateway_container_port }}
+{% endif %}
 Label=clawake.instance={{ instance.name }}
 Label=clawake.role={{ instance.role }}
 Label=clawake.profile={{ instance.profile }}

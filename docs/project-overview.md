@@ -4,7 +4,7 @@ This document contains general project documentation that was previously in the 
 
 ## Concise architectural recommendation
 
-- Keep inventory files in git as source of truth (`inventory/` + `examples/inventory/`).
+- Keep staff files in git as source of truth (`staff/` + `examples/staff/`).
 - Keep operational logic in `src/clawake/services/`; keep CLI thin.
 - Default workflows to safe preview/dry-run.
 - Require explicit `--execute` for mutation (`deploy`/`apply`/`restart`/`upgrade`/`rollback`).
@@ -21,10 +21,18 @@ This document contains general project documentation that was previously in the 
 │   ├── project-overview.md
 │   ├── repo-roadmap.md
 │   └── upgrade-playbook.md
-├── examples/inventory/
-│   ├── dev.yaml
-│   └── prod.yaml
-├── inventory/
+├── examples/staff/
+│   └── product.yml
+├── examples/workspaces/
+│   ├── developer/
+│   └── product-owner/
+├── examples/clawake-config/
+│   ├── developer/
+│   └── product-owner/
+├── examples/clawake-state/
+│   ├── developer/
+│   └── product-owner/
+├── staff/
 │   └── README.md
 ├── templates/quadlet/
 │   └── openclaw.container.j2
@@ -53,8 +61,8 @@ Why these top-level parts exist:
 - `docs/`: operator-facing architecture and runbooks.
 - `src/`: installable application code.
 - `tests/`: focused unit/CLI tests.
-- `examples/inventory/`: declarative examples.
-- `templates/`: Quadlet templates rendered from inventory.
+- `examples/staff/`: declarative examples.
+- `templates/`: Quadlet templates rendered from staff files.
 - `.github/workflows/`: CI checks for lint/test/render validation.
 
 ## Recommended Python stack
@@ -70,7 +78,7 @@ Why these top-level parts exist:
 
 ## Initial config/domain model
 
-Inventory model highlights:
+Staff model highlights:
 - Cluster root for single-host mode (`cluster.name`, `cluster.mode=single_host`, `cluster.primary_host`).
 - Instance identity (`name`, `host`, `role`, `profile`, `container_name`, `quadlet_path`).
 - Explicit per-instance storage paths (`workspace_path`, `config_path`, `state_path`).
@@ -80,8 +88,11 @@ Inventory model highlights:
 - Dashboard metadata/friendly labels.
 
 Examples:
-- `examples/inventory/dev.yaml`
-- `examples/inventory/prod.yaml`
+- `examples/staff/product.yml`
+
+Path convention:
+- Use `${CLAWAKE_WORKSPACE_ROOT}` in staff files for repository-relative absolute paths.
+- Set `CLAWAKE_WORKSPACE_ROOT` to checkout root (VS Code: `${workspaceFolder}`, CI: `${{ github.workspace }}`).
 
 ## Dashboard readiness notes
 

@@ -11,10 +11,9 @@ instances:
     host: solo-host
     role: product_owner
     profile: public
-    workspace_path: /srv/openclaw/product_owner/workspace
-    config_path: /srv/openclaw/product_owner/config
-    state_path: /srv/openclaw/product_owner/state
-    service_scope: user
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner
+    config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/product-owner
+    state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/product-owner
     quadlet_path: openclaw-product-owner.container
     container_name: openclaw-product-owner
     image:
@@ -25,28 +24,24 @@ instances:
     ports:
       - bind_address: 0.0.0.0
         host_port: 9010
-        container_port: 8080
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 0.0.0.0
+        host_port: 9012
+        container_port: 18790
         protocol: tcp
     env_files:
       - /srv/openclaw/product_owner/.env
     labels:
       env: dev
       audience: external
-    public_url: http://localhost:9010
-    health:
-      path: /health
-      interval_seconds: 30
-      timeout_seconds: 5
-      retries: 3
-    update_policy:
-      channel: stable
-      strategy: manual
-      auto_apply: false
+    gateway_runtime:
+      enabled: true
+      bind: lan
     backup_policy:
       enabled: true
       pre_mutation: true
       retention: 5
-      paths: []
     dashboard:
       friendly_name: Product Owner Instance
       owner: Business Owner
@@ -57,10 +52,9 @@ instances:
     host: solo-host
     role: developer
     profile: internal
-    workspace_path: /srv/openclaw/developer/workspace
-    config_path: /srv/openclaw/developer/config
-    state_path: /srv/openclaw/developer/state
-    service_scope: user
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer
+    config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/developer
+    state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/developer
     quadlet_path: openclaw-developer.container
     container_name: openclaw-developer
     image:
@@ -71,28 +65,24 @@ instances:
     ports:
       - bind_address: 127.0.0.1
         host_port: 9011
-        container_port: 8080
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 127.0.0.1
+        host_port: 9013
+        container_port: 18790
         protocol: tcp
     env_files:
       - /srv/openclaw/developer/.env
     labels:
       env: dev
       audience: internal
-    public_url: http://localhost:9011
-    health:
-      path: /health
-      interval_seconds: 30
-      timeout_seconds: 5
-      retries: 3
-    update_policy:
-      channel: stable
-      strategy: manual
-      auto_apply: false
+    gateway_runtime:
+      enabled: true
+      bind: local
     backup_policy:
       enabled: true
       pre_mutation: true
       retention: 5
-      paths: []
     dashboard:
       friendly_name: Developer Instance
       owner: Edge Team

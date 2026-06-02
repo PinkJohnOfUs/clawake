@@ -9,7 +9,10 @@
         "sync"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}"
+        }
       },
       "problemMatcher": []
     }

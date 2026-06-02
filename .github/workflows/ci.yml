@@ -11,6 +11,8 @@ permissions:
 jobs:
   lint-test-render:
     runs-on: ubuntu-latest
+    env:
+      CLAWAKE_WORKSPACE_ROOT: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,7 +38,5 @@ jobs:
 
       - name: Validate + render examples
         run: |
-          clawake validate -c examples/inventory/dev.yaml
-          clawake validate -c examples/inventory/prod.yaml
-          clawake render -c examples/inventory/dev.yaml -o /tmp/render-dev
-          clawake render -c examples/inventory/prod.yaml -o /tmp/render-prod
+          clawake validate -c examples/staff/product.yml
+          clawake render -c examples/staff/product.yml -o /tmp/render-product

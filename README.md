@@ -6,33 +6,46 @@ The sewer system beneath the bowls on which the agents are sitting. Effectively 
 
 Operational defaults:
 - Safe by default (`dry-run` first, explicit `--execute` for mutations).
-- Inventory-driven configuration (`-c/--config` YAML file).
+- Staff-driven configuration (`-c/--config` YAML file).
 
 ## CLI Reference
 
+### Portable staff paths
+
+`examples/staff/product.yml` uses `${CLAWAKE_WORKSPACE_ROOT}` so paths stay portable across checkouts.
+
+For local CLI usage, set it once per shell:
+
+```bash
+export CLAWAKE_WORKSPACE_ROOT="$PWD"
+```
+
+In VS Code launch configurations, set `CLAWAKE_WORKSPACE_ROOT` to `${workspaceFolder}`.
+In CI, set `CLAWAKE_WORKSPACE_ROOT` to the repository workspace path.
+
 ### Validate and render
 
-- `clawake validate --config|-c <inventory.yaml>`
-- `clawake render --config|-c <inventory.yaml> [--output|-o <render-dir>]`
-- `clawake plan --config|-c <inventory.yaml> [--output|-o <render-dir>]`
+- `clawake validate --config|-c <staff.yaml>`
+- `clawake render --config|-c <staff.yaml> [--output|-o <render-dir>]`
+- `clawake plan --config|-c <staff.yaml> [--output|-o <render-dir>]`
 
 ### Deploy and reconcile
 
-- `clawake deploy --config|-c <inventory.yaml> --target <quadlet-dir> [--execute]`
-- `clawake apply --config|-c <inventory.yaml> --target <quadlet-dir> [--output|-o <render-dir>] [--execute]`
+- `clawake deploy --config|-c <staff.yaml> --target <quadlet-dir> [--execute]`
+- `clawake apply --config|-c <staff.yaml> --target <quadlet-dir> [--output|-o <render-dir>] [--execute]`
 
 ### Service operations
 
 - `clawake restart <instance> [--execute]`
 - `clawake status <instance> [--execute]`
-- `clawake status-cluster --config|-c <inventory.yaml> [--format text|json] [--execute]`
+- `clawake status-cluster --config|-c <staff.yaml> [--format text|json] [--execute]`
 - `clawake logs <instance> [--lines <N>] [--execute]`
 
 ### Backup and image lifecycle
 
-- `clawake backup --config|-c <inventory.yaml> --instance|-i <name> [--output|-o <backup-dir>] [--execute]`
-- `clawake upgrade --config|-c <inventory.yaml> --instance|-i <name> [--tag <tag>] [--digest <sha256:...>] [--execute]`
-- `clawake rollback --config|-c <inventory.yaml> --instance|-i <name> [--execute]`
+- `clawake backup --config|-c <staff.yaml> --instance|-i <name> [--output|-o <backup-dir>] [--execute]`
+- `clawake upgrade --config|-c <staff.yaml> --instance|-i <name> [--tag <tag>] [--digest <sha256:...>] [--execute]`
+- `clawake rollback --config|-c <staff.yaml> --instance|-i <name> [--execute]`
 
 ### Parameter behavior
 
@@ -44,7 +57,7 @@ Operational defaults:
 
 ## Documentation
 
-Please find general architecture, roadmap, and operational notes in`docs/`.
+Please find general architecture, roadmap, and operational notes in `docs/`.
 
 - Architecture: `docs/architecture.md`
 - Roadmap: `docs/repo-roadmap.md`

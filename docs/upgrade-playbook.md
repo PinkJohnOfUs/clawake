@@ -1,13 +1,13 @@
 # Upgrade Playbook (MVP)
 
-1. Validate inventory:
-   - `clawake validate -c examples/inventory/prod.yaml`
+1. Validate staff file:
+   - `clawake validate -c examples/staff/product.yml`
 2. Render and inspect changes:
-   - `clawake plan -c examples/inventory/prod.yaml -o .rendered/prod`
+   - `clawake plan -c examples/staff/product.yml -o .rendered/product`
 3. Create backup for target instance:
-   - `clawake backup -c examples/inventory/prod.yaml -i openclaw-prod -o .backups --execute`
+   - `clawake backup -c examples/staff/product.yml -i openclaw-prod -o .backups --execute`
 4. Deploy rendered Quadlet:
-   - `clawake deploy -c examples/inventory/prod.yaml --target ~/.config/containers/systemd --execute`
+   - `clawake deploy -c examples/staff/product.yml --target ~/.config/containers/systemd --execute`
 5. Reload and restart service:
    - `clawake restart openclaw-prod --execute`
 6. Verify health/logs:
@@ -17,4 +17,4 @@
 
 ## Rollback concept
 
-Store known-good digest in inventory (`image.known_good_digest`) and revert to it during rollback workflows.
+Store known-good digest in the staff file (`image.known_good_digest`) and revert to it during rollback workflows.

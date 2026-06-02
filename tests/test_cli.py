@@ -39,7 +39,7 @@ class FakeSystemdService:
 
 
 def test_validate_command() -> None:
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/inventory/dev.yaml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
     assert result.exit_code == 0
     assert "is valid for cluster" in result.stdout
 
@@ -51,7 +51,7 @@ def test_apply_dry_run(tmp_path: Path) -> None:
         [
             "apply",
             "--config",
-            str(Path("examples/inventory/dev.yaml")),
+            str(Path("examples/staff/product.yml")),
             "--target",
             str(target),
             "--output",
@@ -74,7 +74,7 @@ def test_apply_execute(monkeypatch: object, tmp_path: Path) -> None:
         [
             "apply",
             "--config",
-            str(Path("examples/inventory/dev.yaml")),
+            str(Path("examples/staff/product.yml")),
             "--target",
             str(target),
             "--output",
@@ -96,7 +96,7 @@ def test_status_cluster_json(monkeypatch: object) -> None:
         [
             "status-cluster",
             "--config",
-            str(Path("examples/inventory/dev.yaml")),
+            str(Path("examples/staff/product.yml")),
             "--format",
             "json",
         ],
