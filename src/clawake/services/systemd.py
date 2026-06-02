@@ -34,6 +34,9 @@ class SystemdService:
             stderr=process.stderr.strip(),
         )
 
+    def daemon_reload(self, execute: bool = False) -> CommandResult:
+        return self._run(["systemctl", "--user", "daemon-reload"], execute)
+
     def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
         return self._run(["systemctl", "--user", "restart", self.unit_name(instance_name)], execute)
 

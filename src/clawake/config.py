@@ -7,6 +7,13 @@ import yaml
 from pydantic import BaseModel, Field, model_validator
 
 
+class ClusterSpec(BaseModel):
+    name: str
+    mode: Literal["single_host"] = "single_host"
+    primary_host: str
+    description: str | None = None
+
+
 class HostSpec(BaseModel):
     name: str
     quadlet_root: str = "~/.config/containers/systemd"
@@ -63,6 +70,11 @@ class DashboardMeta(BaseModel):
 class InstanceSpec(BaseModel):
     name: str
     host: str
+    role: Literal["product_owner", "developer"]
+    profile: Literal["public", "internal"]
+    workspace_path: str
+    config_path: str
+    state_path: str
     service_scope: Literal["user"] = "user"
     quadlet_path: str
     container_name: str
@@ -77,9 +89,20 @@ class InstanceSpec(BaseModel):
     backup_policy: BackupPolicy = Field(default_factory=BackupPolicy)
     dashboard: DashboardMeta
 
+    @model_validator(mode="after")
+    def ensure_backup_defaults(self) -> InstanceSpec:
+        if not self.backup_policy.paths:
+            self.backup_policy.paths = [
+                self.workspace_path,
+                self.config_path,
+                self.state_path,
+            ]
+        return self
+
 
 class Inventory(BaseModel):
     version: int = 1
+    cluster: ClusterSpec
     hosts: list[HostSpec]
     instances: list[InstanceSpec]
 
@@ -89,8 +112,17 @@ class Inventory(BaseModel):
         if len(host_names) != len(self.hosts):
             raise ValueError("Duplicate host names are not allowed")
 
+        if len(self.hosts) != 1:
+            raise ValueError("single_host mode requires exactly one host")
+
+        if self.cluster.primary_host not in host_names:
+            raise ValueError(
+                f"cluster.primary_host '{self.cluster.primary_host}' does not match any host"
+            )
+
         instance_names: set[str] = set()
-        used_ports: dict[tuple[str, str, int], str] = {}
+        used_ports: dict[tuple[str, str, int, str], str] = {}
+        used_paths: dict[str, tuple[str, str]] = {}
 
         for instance in self.instances:
             if instance.host not in host_names:
@@ -111,10 +143,27 @@ class Inventory(BaseModel):
                     )
                 used_ports[port_key] = instance.name
 
+            storage_paths = {
+                "workspace_path": instance.workspace_path,
+                "config_path": instance.config_path,
+                "state_path": instance.state_path,
+            }
+            for boundary, raw_path in storage_paths.items():
+                normalized = str(Path(raw_path).expanduser())
+                existing = used_paths.get(normalized)
+                if existing is not None:
+                    raise ValueError(
+                        f"Path collision for '{normalized}' between "
+                        f"{existing[0]}.{existing[1]} and {instance.name}.{boundary}"
+                    )
+                used_paths[normalized] = (instance.name, boundary)
+
         return self
 
 
 def load_inventory(path: str | Path) -> Inventory:
     inventory_path = Path(path)
     data = yaml.safe_load(inventory_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("Inventory file must contain a YAML mapping")
     return Inventory.model_validate(data)

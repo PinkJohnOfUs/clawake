@@ -1,4 +1,8 @@
 version: 1
+cluster:
+  name: prod-single-host
+  mode: single_host
+  primary_host: prod-a
 hosts:
   - name: prod-a
     quadlet_root: ~/.config/containers/systemd
@@ -6,6 +10,11 @@ hosts:
 instances:
   - name: openclaw-prod
     host: prod-a
+    role: product_owner
+    profile: public
+    workspace_path: /srv/openclaw/prod/workspace
+    config_path: /srv/openclaw/prod/config
+    state_path: /srv/openclaw/prod/state
     service_scope: user
     quadlet_path: openclaw-prod.container
     container_name: openclaw-prod
@@ -19,13 +28,6 @@ instances:
         host_port: 9010
         container_port: 8080
         protocol: tcp
-    mounts:
-      - source: /srv/openclaw/prod/workspace
-        target: /workspace
-        read_only: false
-      - source: /srv/openclaw/prod/config
-        target: /app/config
-        read_only: false
     env_files:
       - /srv/openclaw/prod/.env
     labels:
@@ -45,9 +47,7 @@ instances:
       enabled: true
       pre_mutation: true
       retention: 10
-      paths:
-        - /srv/openclaw/prod/workspace
-        - /srv/openclaw/prod/config
+      paths: []
     dashboard:
       friendly_name: OpenClaw Production
       owner: Operations

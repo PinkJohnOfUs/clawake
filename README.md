@@ -72,9 +72,11 @@ Implemented CLI commands (safe by default):
 - `clawake validate -c <inventory.yaml>`
 - `clawake render -c <inventory.yaml> -o <render-dir>`
 - `clawake plan -c <inventory.yaml> -o <render-dir>` (preview/diff)
+- `clawake apply -c <inventory.yaml> --target <quadlet-dir> [--output <render-dir>] [--execute]`
 - `clawake deploy -c <inventory.yaml> --target <quadlet-dir> [--execute]`
 - `clawake restart <instance> [--execute]`
 - `clawake status <instance> [--execute]`
+- `clawake status-cluster -c <inventory.yaml> [--format text|json] [--execute]`
 - `clawake logs <instance> [--lines N] [--execute]`
 - `clawake backup -c <inventory.yaml> -i <instance> -o <backup-dir> [--execute]`
 - `clawake upgrade -c <inventory.yaml> -i <instance> [--tag X] [--digest Y] [--execute]`
@@ -85,7 +87,9 @@ Commands that mutate host state are dry-run unless `--execute` is set.
 ## 5) Initial config/domain model
 
 Inventory models include:
-- instance name, host name, service scope, quadlet path, container name
+- cluster root for single-host mode (`cluster.name`, `cluster.mode=single_host`, `cluster.primary_host`)
+- instance name, host name, role, profile, service scope, quadlet path, container name
+- explicit per-instance `workspace_path`, `config_path`, `state_path`
 - image repository/tag/digest and known-good digest
 - ports/bind address, mounts, env files, labels
 - public URL, health expectations
@@ -101,6 +105,7 @@ See examples:
 - Core behavior lives in `services/*` and is UI-agnostic.
 - CLI orchestrates service calls only.
 - Future dashboard can call same services from FastAPI routes.
+- `status-cluster --format json` provides a machine-readable status snapshot contract.
 - Suggested MVP dashboard features for non-developers:
   - list instances and friendly labels
   - health + status summary
