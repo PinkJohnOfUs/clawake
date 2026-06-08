@@ -8,6 +8,43 @@ Operational defaults:
 - Safe by default (`dry-run` first, explicit `--execute` for mutations).
 - Staff-driven configuration (`-c/--config` YAML file).
 
+## CLI Setup (uv + make)
+
+`pyproject.toml` already defines the console entry point `clawake = "clawake.cli:app"`.
+That means the project knows how to expose a `clawake` command, but the command is only directly available after you run it through `uv` or install it into your user environment.
+
+Preferred for contributors (repo-local and reproducible):
+
+```bash
+make install-dev
+make validate
+make render
+make plan
+```
+
+This uses `uv run clawake ...` against the project environment and avoids global drift.
+
+Optional user-level installation (global command on your machine):
+
+```bash
+make install-tool
+clawake --help
+```
+
+Remove user-level installation:
+
+```bash
+make uninstall-tool
+```
+
+Useful overrides:
+
+```bash
+make validate CONFIG=examples/staff/product.yml
+make render CONFIG=examples/staff/product.yml OUTPUT=.rendered
+make plan CONFIG=examples/staff/product.yml OUTPUT=.rendered
+```
+
 ## CLI Reference
 
 ### Portable staff paths

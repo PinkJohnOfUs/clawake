@@ -17,10 +17,10 @@ instances:
     quadlet_path: openclaw-product-owner.container
     container_name: openclaw-product-owner
     image:
-      repository: ghcr.io/openclaw/gateway
-      tag: "0.14.0"
-      digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
-      known_good_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+      repository: ghcr.io/openclaw/openclaw
+      tag: "2026.6.1"
+      digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
+      known_good_digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
     ports:
       - bind_address: 0.0.0.0
         host_port: 9010
@@ -58,10 +58,10 @@ instances:
     quadlet_path: openclaw-developer.container
     container_name: openclaw-developer
     image:
-      repository: ghcr.io/openclaw/gateway
-      tag: "0.14.0"
-      digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
-      known_good_digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+      repository: ghcr.io/openclaw/openclaw
+      tag: "2026.6.1"
+      digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
+      known_good_digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
     ports:
       - bind_address: 127.0.0.1
         host_port: 9011

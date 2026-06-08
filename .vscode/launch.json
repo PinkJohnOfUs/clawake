@@ -23,7 +23,7 @@
     },
     {
       "name": "Clawake: render (product)",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "module": "clawake.cli",
       "args": [

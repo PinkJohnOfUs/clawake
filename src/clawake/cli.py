@@ -13,6 +13,7 @@ from clawake.config import InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance
 from clawake.services.render import render_instance, render_inventory
 from clawake.services.systemd import CommandResult, SystemdService
+from clawake.services.image_check import ImageCheckError, check_image_availability
 from clawake.services.upgrade import (
     apply_upgrade,
     backup_config,
@@ -64,11 +65,59 @@ def _status_state(result: CommandResult, execute: bool) -> str:
         return "healthy"
     return "failed"
 
+def _registry_host(image_ref: str) -> str:
+    return image_ref.split("/", 1)[0]
+
+def _enrich_public_image_hint(error: ImageCheckError) -> str:
+    hint = error.hint or "Verify the image repository, tag, and digest, and confirm that the image is publicly reachable."
+    reason = error.reason.lower()
+    if _registry_host(error.image_ref) == "ghcr.io" and any(token in reason for token in ("unauthorized", "forbidden", "403", "access denied")):
+        ghcr_hint = (
+            "OpenClaw images are public and can be found here: "
+            "https://github.com/openclaw/openclaw/pkgs/container/openclaw"
+        )
+        if ghcr_hint not in hint:
+            hint = f"{hint} {ghcr_hint}"
+    return hint
+
+def _print_validation_failure(instance_name: str, error: ImageCheckError) -> None:
+    typer.secho(
+        f"[ERROR] {instance_name}: {error.image_ref} -> {error.reason}",
+        fg="red",
+        bold=True,
+        err=True,
+    )
+
+
+def _print_validation_fix(hint: str) -> None:
+    typer.secho(f"[fix] {hint}", fg="yellow", err=True)
+
 
 @app.command()
 def validate(config: ConfigPath) -> None:
-    """Validate inventory configuration."""
+    """Validate inventory configuration and verify image availability."""
     inventory = _load(config)
+
+    errors: list[tuple[str, ImageCheckError]] = []
+    for instance in inventory.instances:
+        try:
+            check_image_availability(instance.image)
+        except ImageCheckError as exc:
+            errors.append((instance.name, exc))
+
+    if errors:
+        typer.secho(f"Validation failed: {len(errors)} image check(s) failed", fg="red", bold=True, err=True)
+        hints: list[str] = []
+        for instance_name, exc in errors:
+            hint = _enrich_public_image_hint(exc)
+            _print_validation_failure(instance_name, exc)
+            if hint not in hints:
+                hints.append(hint)
+
+        for hint in hints:
+            _print_validation_fix(hint)
+        raise typer.Exit(1)
+
     typer.echo(f"OK: {config} is valid for cluster '{inventory.cluster.name}'")
 
 

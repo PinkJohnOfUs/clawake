@@ -20,6 +20,7 @@ Ich nutze Clawake als Stakeholder unseres Produkts. Ich denke in Mitarbeitern: j
 
 Startpunkt sind die Befehle fuer Validate, Render und Plan.
 
+0. `make install-dev`
 1. `clawake validate --config|-c <staff.yaml>`
 2. `clawake render --config|-c <staff.yaml> [--output|-o <render-dir>]`
 3. `clawake plan --config|-c <staff.yaml> [--output|-o <render-dir>]`
