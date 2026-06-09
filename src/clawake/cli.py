@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Annotated, Literal
@@ -33,6 +34,7 @@ InstanceName = Annotated[str, typer.Option(..., "--instance", "-i")]
 TagValue = Annotated[str | None, typer.Option("--tag")]
 DigestValue = Annotated[str | None, typer.Option("--digest")]
 StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
+_ENV_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _load(path: Path) -> Inventory:
@@ -65,6 +67,32 @@ def _status_state(result: CommandResult, execute: bool) -> str:
         return "healthy"
     return "failed"
 
+
+def _status_needs_diagnostics(result: CommandResult) -> bool:
+    details = "\n".join(part for part in (result.stdout, result.stderr) if part).lower()
+    if result.return_code != 0:
+        return True
+    return any(token in details for token in ("inactive (dead)", "failed", "activating (auto-restart)"))
+
+
+def _status_diagnostics(service: SystemdService, instance_name: str, execute: bool) -> CommandResult | None:
+    if not execute:
+        return None
+    logs_result = service.logs(instance_name, lines=50, execute=True)
+    if not logs_result.stdout and not logs_result.stderr:
+        return None
+    return logs_result
+
+
+def _diagnostic_summary(result: CommandResult | None) -> str | None:
+    if result is None:
+        return None
+    for line in (result.stdout or result.stderr).splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
 def _registry_host(image_ref: str) -> str:
     return image_ref.split("/", 1)[0]
 
@@ -93,26 +121,71 @@ def _print_validation_fix(hint: str) -> None:
     typer.secho(f"[fix] {hint}", fg="yellow", err=True)
 
 
+def _validate_env_file(instance_name: str, env_file: str) -> list[str]:
+    issues: list[str] = []
+    path = Path(env_file).expanduser()
+
+    if not path.exists():
+        issues.append(f"[ERROR] {instance_name}: EnvironmentFile missing: {path}")
+        return issues
+    if not path.is_file():
+        issues.append(f"[ERROR] {instance_name}: EnvironmentFile is not a regular file: {path}")
+        return issues
+
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            issues.append(
+                f"[ERROR] {instance_name}: invalid env entry in {path}:{line_number} (expected KEY=VALUE)"
+            )
+            continue
+        key, _ = line.split("=", 1)
+        if not _ENV_KEY_PATTERN.fullmatch(key.strip()):
+            issues.append(
+                f"[ERROR] {instance_name}: invalid env key in {path}:{line_number} ('{key.strip()}')"
+            )
+    return issues
+
+
 @app.command()
 def validate(config: ConfigPath) -> None:
     """Validate inventory configuration and verify image availability."""
     inventory = _load(config)
 
-    errors: list[tuple[str, ImageCheckError]] = []
+    image_errors: list[tuple[str, ImageCheckError]] = []
+    env_file_issues: list[str] = []
+
     for instance in inventory.instances:
         try:
             check_image_availability(instance.image)
         except ImageCheckError as exc:
-            errors.append((instance.name, exc))
+            image_errors.append((instance.name, exc))
 
-    if errors:
-        typer.secho(f"Validation failed: {len(errors)} image check(s) failed", fg="red", bold=True, err=True)
+        for env_file in instance.env_files:
+            env_file_issues.extend(_validate_env_file(instance.name, env_file))
+
+    if image_errors or env_file_issues:
+        typer.secho(
+            "Validation failed: "
+            f"{len(image_errors)} image check(s), {len(env_file_issues)} env file issue(s)",
+            fg="red",
+            bold=True,
+            err=True,
+        )
         hints: list[str] = []
-        for instance_name, exc in errors:
+        for instance_name, exc in image_errors:
             hint = _enrich_public_image_hint(exc)
             _print_validation_failure(instance_name, exc)
             if hint not in hints:
                 hints.append(hint)
+
+        for issue in env_file_issues:
+            typer.secho(issue, fg="red", bold=True, err=True)
+
+        if env_file_issues:
+            hints.append("Create the missing env files and ensure each line uses KEY=VALUE syntax")
 
         for hint in hints:
             _print_validation_fix(hint)
@@ -231,11 +304,14 @@ def apply(
         shutil.copy2(rendered_file, destination)
         typer.echo(f"Deployed {rendered_file} -> {destination}")
 
-    if changed:
-        reload_result = service.daemon_reload(execute=True)
-        _print_result(reload_result)
-        failed = failed or reload_result.return_code != 0
+    reload_result = service.daemon_reload(execute=True)
+    _print_result(reload_result)
+    failed = failed or reload_result.return_code != 0
 
+    if not changed:
+        typer.echo("No rendered changes detected; daemon-reload completed.")
+
+    if changed:
         for instance, _, _ in changed:
             restart_result = service.restart(instance.name, execute=True)
             _print_result(restart_result)
@@ -260,6 +336,13 @@ def status(instance: str, execute: ExecuteFlag = False) -> None:
     result = service.status(instance, execute=execute)
     _print_result(result)
 
+    if execute and _status_needs_diagnostics(result):
+        typer.secho("Recent journal entries for failure analysis:", fg="yellow", err=True)
+        logs_result = _status_diagnostics(service, instance, execute=True)
+        if logs_result is None:
+            return
+        _print_result(logs_result)
+
 
 @app.command("status-cluster")
 def status_cluster(
@@ -274,6 +357,9 @@ def status_cluster(
 
     for instance in inventory.instances:
         result = service.status(instance.name, execute=execute)
+        diagnostics = None
+        if _status_needs_diagnostics(result):
+            diagnostics = _status_diagnostics(service, instance.name, execute=execute)
         row = {
             "instance": instance.name,
             "role": instance.role,
@@ -283,6 +369,7 @@ def status_cluster(
             "unit": service.unit_name(instance.name),
             "stdout": result.stdout,
             "stderr": result.stderr,
+            "diagnostics": diagnostics.stdout if diagnostics and diagnostics.stdout else diagnostics.stderr if diagnostics else "",
         }
         rows.append(row)
 
@@ -304,6 +391,13 @@ def status_cluster(
                 f"- {row['instance']} [{row['role']}/{row['profile']}] "
                 f"state={row['state']} rc={row['return_code']}"
             )
+            diagnostics_summary = _diagnostic_summary(
+                CommandResult(command=[], return_code=0, stdout=str(row["diagnostics"]), stderr="")
+                if row["diagnostics"]
+                else None
+            )
+            if diagnostics_summary:
+                typer.echo(f"  cause: {diagnostics_summary}")
 
     if execute and any(int(row["return_code"]) != 0 for row in rows):
         raise typer.Exit(code=1)

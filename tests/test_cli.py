@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -35,8 +36,17 @@ class FakeSystemdService:
             stderr="",
         )
 
+    def logs(self, instance_name: str, lines: int = 100, execute: bool = False) -> CommandResult:
+        return CommandResult(
+            command=["journalctl", "--user-unit", f"{instance_name}.service", "-n", str(lines)],
+            return_code=0,
+            stdout="log output",
+            stderr="",
+        )
+
     def unit_name(self, instance_name: str) -> str:
         return f"{instance_name}.service"
+
 
 def test_validate_command(monkeypatch: object) -> None:
     from clawake import cli
@@ -47,6 +57,87 @@ def test_validate_command(monkeypatch: object) -> None:
     result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
     assert result.exit_code == 0
     assert "is valid for cluster" in result.stdout
+
+
+def test_validate_missing_env_file(monkeypatch: object, tmp_path: Path) -> None:
+    from clawake import cli
+
+    monkeypatch.setattr(cli, "check_image_availability", lambda _: None)
+
+    cfg = tmp_path / "missing-env.yml"
+    cfg.write_text(
+        """
+version: 1
+cluster:
+  name: c
+  mode: single_host
+  primary_host: a
+hosts:
+  - name: a
+instances:
+  - name: one
+    host: a
+    role: developer
+    profile: internal
+    workspace_path: /tmp/one/workspace
+    config_path: /tmp/one/config
+    state_path: /tmp/one/state
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: ghcr.io/x, tag: "1"}
+    env_files:
+      - /tmp/does-not-exist.env
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["validate", "--config", str(cfg)])
+
+    assert result.exit_code != 0
+    assert "EnvironmentFile missing" in result.output
+
+
+def test_validate_invalid_env_file_content(monkeypatch: object, tmp_path: Path) -> None:
+    from clawake import cli
+
+    monkeypatch.setattr(cli, "check_image_availability", lambda _: None)
+
+    env_file = tmp_path / "invalid.env"
+    env_file.write_text("BAD LINE\nGOOD_KEY=value\n", encoding="utf-8")
+
+    cfg = tmp_path / "invalid-env.yml"
+    cfg.write_text(
+        f"""
+version: 1
+cluster:
+  name: c
+  mode: single_host
+  primary_host: a
+hosts:
+  - name: a
+instances:
+  - name: one
+    host: a
+    role: developer
+    profile: internal
+    workspace_path: /tmp/one/workspace
+    config_path: /tmp/one/config
+    state_path: /tmp/one/state
+    quadlet_path: one.container
+    container_name: one
+    image: {{repository: ghcr.io/x, tag: "1"}}
+    env_files:
+      - {env_file}
+    dashboard: {{friendly_name: One}}
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["validate", "--config", str(cfg)])
+
+    assert result.exit_code != 0
+    assert "expected KEY=VALUE" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +315,102 @@ def test_apply_execute(monkeypatch: object, tmp_path: Path) -> None:
     assert (target / "openclaw-developer.container").exists()
 
 
+def test_apply_execute_no_changes_still_reloads(monkeypatch: object, tmp_path: Path) -> None:
+    from clawake import cli
+
+    class RecordingSystemdService:
+        daemon_reload_calls = 0
+        restart_calls = 0
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.daemon_reload_calls += 1
+            return CommandResult(
+                command=["systemctl", "--user", "daemon-reload"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.restart_calls += 1
+            return CommandResult(
+                command=["systemctl", "--user", "restart", f"{instance_name}.service"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+    monkeypatch.setattr(cli, "SystemdService", RecordingSystemdService)
+
+    target = tmp_path / "quadlet"
+    output = tmp_path / "rendered"
+
+    render_result = runner.invoke(
+        app,
+        [
+            "render",
+            "--config",
+            str(Path("examples/staff/product.yml")),
+            "--output",
+            str(output),
+        ],
+    )
+    assert render_result.exit_code == 0
+
+    target.mkdir(parents=True, exist_ok=True)
+    for rendered_file in output.glob("*.container"):
+        shutil.copy2(rendered_file, target / rendered_file.name)
+
+    result = runner.invoke(
+        app,
+        [
+            "apply",
+            "--config",
+            str(Path("examples/staff/product.yml")),
+            "--target",
+            str(target),
+            "--output",
+            str(output),
+            "--execute",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert RecordingSystemdService.daemon_reload_calls == 1
+    assert RecordingSystemdService.restart_calls == 0
+    assert "No rendered changes detected; daemon-reload completed." in result.output
+
+
+def test_status_inactive_service_prints_recent_logs(monkeypatch: object) -> None:
+    from clawake import cli
+
+    class DiagnosticSystemdService:
+        def status(self, instance_name: str, execute: bool = False) -> CommandResult:
+            return CommandResult(
+                command=["systemctl", "--user", "status", f"{instance_name}.service"],
+                return_code=3,
+                stdout="Active: inactive (dead)",
+                stderr="",
+            )
+
+        def logs(self, instance_name: str, lines: int = 100, execute: bool = False) -> CommandResult:
+            return CommandResult(
+                command=["journalctl", "--user-unit", f"{instance_name}.service", "-n", str(lines)],
+                return_code=0,
+                stdout="EnvironmentFile=/missing.env\nNo such file or directory",
+                stderr="",
+            )
+
+    monkeypatch.setattr(cli, "SystemdService", DiagnosticSystemdService)
+
+    result = runner.invoke(app, ["status", "openclaw-developer", "--execute"])
+
+    assert result.exit_code == 0
+    assert "inactive (dead)" in result.output
+    assert "Recent journal entries for failure analysis:" in result.output
+    assert "No such file or directory" in result.output
+
+
 def test_status_cluster_json(monkeypatch: object) -> None:
     from clawake import cli
 
@@ -246,3 +433,53 @@ def test_status_cluster_json(monkeypatch: object) -> None:
         "product_owner",
         "developer",
     }
+
+
+def test_status_cluster_execute_prints_cause(monkeypatch: object) -> None:
+    from clawake import cli
+
+    class ClusterDiagnosticSystemdService:
+        def status(self, instance_name: str, execute: bool = False) -> CommandResult:
+            if instance_name == "openclaw-developer":
+                return CommandResult(
+                    command=["systemctl", "--user", "status", f"{instance_name}.service"],
+                    return_code=3,
+                    stdout="Active: failed (Result: exit-code)",
+                    stderr="",
+                )
+            return CommandResult(
+                command=["systemctl", "--user", "status", f"{instance_name}.service"],
+                return_code=0,
+                stdout="Active: active (running)",
+                stderr="",
+            )
+
+        def logs(self, instance_name: str, lines: int = 100, execute: bool = False) -> CommandResult:
+            return CommandResult(
+                command=["journalctl", "--user-unit", f"{instance_name}.service", "-n", str(lines)],
+                return_code=0,
+                stdout="Error: missing API key",
+                stderr="",
+            )
+
+        def unit_name(self, instance_name: str) -> str:
+            return f"{instance_name}.service"
+
+    monkeypatch.setattr(cli, "SystemdService", ClusterDiagnosticSystemdService)
+
+    result = runner.invoke(
+        app,
+        [
+            "status-cluster",
+            "--config",
+            str(Path("examples/staff/product.yml")),
+            "--format",
+            "text",
+            "--execute",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "openclaw-product-owner [product_owner/public] state=healthy rc=0" in result.output
+    assert "openclaw-developer [developer/internal] state=failed rc=3" in result.output
+    assert "cause: Error: missing API key" in result.output

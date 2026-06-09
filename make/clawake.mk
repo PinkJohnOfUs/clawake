@@ -48,7 +48,7 @@ apply-exec: ## Execute apply to TARGET
 	$(CLAWAKE_RUN) apply -c $(CONFIG) --target $(TARGET) -o $(OUTPUT) --execute
 
 status-cluster: ## Check status-cluster in text format
-	$(CLAWAKE_RUN) status-cluster -c $(CONFIG) --format text
+	$(CLAWAKE_RUN) status-cluster -c $(CONFIG) --format text --execute
 
 test: ## Run pytest
 	$(UV) run pytest

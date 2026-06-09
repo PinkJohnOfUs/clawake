@@ -65,7 +65,7 @@ class BackupPolicy(BaseModel):
 
 class GatewayRuntimeSpec(BaseModel):
     enabled: bool = False
-    bind: Literal["local", "lan"] = "lan"
+    bind: Literal["loopback", "lan", "tailnet", "auto", "custom"] = "lan"
     gateway_container_port: int = Field(default=18789, ge=1, le=65535)
     bridge_container_port: int = Field(default=18790, ge=1, le=65535)
 
