@@ -15,6 +15,11 @@ from clawake.services.backup import backup_instance
 from clawake.services.render import render_instance, render_inventory
 from clawake.services.systemd import CommandResult, SystemdService
 from clawake.services.image_check import ImageCheckError, check_image_availability
+from clawake.services.onboarding import (
+    AutoOnboardError,
+    build_auto_onboard_plan,
+    write_auto_onboard_config,
+)
 from clawake.services.upgrade import (
     apply_upgrade,
     backup_config,
@@ -430,6 +435,50 @@ def backup(
         typer.echo(f"Backup created: {archive}")
     else:
         typer.echo(f"DRY RUN backup would create: {archive}")
+
+
+@app.command("auto-onboard")
+def auto_onboard(
+    config: ConfigPath,
+    instance: InstanceName,
+    execute: ExecuteFlag = False,
+) -> None:
+    """Resolve auto_onboard config and write openclaw.json for an instance."""
+    inventory = _load(config)
+    chosen = _instance_by_name(inventory, instance)
+
+    try:
+        plan = build_auto_onboard_plan(chosen)
+    except AutoOnboardError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if plan.missing_required_env:
+        missing = ", ".join(plan.missing_required_env)
+        typer.secho(
+            f"[ERROR] Missing required environment variables for {chosen.name}: {missing}",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    top_level_keys = ", ".join(sorted(plan.config.keys()))
+    typer.echo(f"Auto-onboard plan for {chosen.name}")
+    typer.echo(f" - source: {config}")
+    typer.echo(f" - target: {plan.target_path}")
+    typer.echo(f" - backup: {plan.backup_path}")
+    typer.echo(f" - openclaw.json keys: {top_level_keys}")
+    if plan.guardrails:
+        typer.secho("Guardrails:", fg="yellow", err=True)
+        for guardrail in plan.guardrails:
+            typer.secho(f" - {guardrail}", fg="yellow", err=True)
+
+    if not execute:
+        typer.echo("DRY RUN auto-onboard complete. Re-run with --execute to write openclaw.json.")
+        return
+
+    write_auto_onboard_config(plan, execute=True)
+    typer.echo(f"Auto-onboard wrote {plan.target_path}")
 
 
 @app.command()

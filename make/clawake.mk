@@ -2,6 +2,7 @@ UV ?= uv
 CONFIG ?= examples/staff/product.yml
 OUTPUT ?= .rendered
 TARGET ?= $(HOME)/.config/containers/systemd
+INSTANCE ?= excalibot-product-owner
 CLAWAKE_WORKSPACE_ROOT ?= $(CURDIR)
 
 export CLAWAKE_WORKSPACE_ROOT
@@ -9,7 +10,7 @@ export CLAWAKE_WORKSPACE_ROOT
 CLAWAKE_RUN = $(UV) run clawake
 
 .PHONY: uv-sync install-dev install-tool uninstall-tool doctor \
-	validate render plan deploy deploy-exec apply apply-exec \
+	validate render plan deploy deploy-exec apply apply-exec auto-onboard auto-onboard-exec \
 	status-cluster test lint fmt
 
 uv-sync: ## Install project dependencies into .venv via uv
@@ -46,6 +47,12 @@ apply: ## Dry-run apply to TARGET
 
 apply-exec: ## Execute apply to TARGET
 	$(CLAWAKE_RUN) apply -c $(CONFIG) --target $(TARGET) -o $(OUTPUT) --execute
+
+auto-onboard: ## Dry-run auto-onboard plan for INSTANCE
+	$(CLAWAKE_RUN) auto-onboard -c $(CONFIG) -i $(INSTANCE)
+
+auto-onboard-exec: ## Execute auto-onboard for INSTANCE
+	$(CLAWAKE_RUN) auto-onboard -c $(CONFIG) -i $(INSTANCE) --execute
 
 status-cluster: ## Check status-cluster in text format
 	$(CLAWAKE_RUN) status-cluster -c $(CONFIG) --format text --execute

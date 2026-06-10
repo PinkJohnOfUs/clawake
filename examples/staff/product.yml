@@ -7,20 +7,18 @@ hosts:
   - name: solo-host
     quadlet_root: ~/.config/containers/systemd
 instances:
-  - name: openclaw-product-owner
+  - name: excalibot-product-owner
     host: solo-host
     role: product_owner
     profile: public
     workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner
     config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/product-owner
     state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/product-owner
-    quadlet_path: openclaw-product-owner.container
-    container_name: openclaw-product-owner
+    quadlet_path: excalibot-product-owner.container
+    container_name: excalibot-product-owner
     image:
       repository: ghcr.io/openclaw/openclaw
-      tag: "2026.6.1"
-      digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
-      known_good_digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
+      tag: "2026.6.5"
     ports:
       - bind_address: 0.0.0.0
         host_port: 9010
@@ -37,7 +35,19 @@ instances:
       audience: external
     gateway_runtime:
       enabled: true
-      bind: lan
+      bind: loopback
+    auto_onboard:
+      required_env:
+        - OPENCLAW_GATEWAY_BIND
+        - OPENCLAW_GATEWAY_TOKEN
+      openclaw_config:
+        gateway:
+          mode: "$ENV:OPENCLAW_GATEWAY_BIND"
+          auth:
+            token: "$ENV:OPENCLAW_GATEWAY_TOKEN"
+        channels:
+          discord:
+            token: "$ENV?:DISCORD_BOT_TOKEN"
     backup_policy:
       enabled: true
       pre_mutation: true
@@ -48,15 +58,15 @@ instances:
       description: External-facing Product Owner runtime
       tags: [product_owner, public]
 
-  - name: openclaw-developer
+  - name: excalibot-developer
     host: solo-host
     role: developer
     profile: internal
     workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer
     config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/developer
     state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/developer
-    quadlet_path: openclaw-developer.container
-    container_name: openclaw-developer
+    quadlet_path: excalibot-developer.container
+    container_name: excalibot-developer
     image:
       repository: ghcr.io/openclaw/openclaw
       tag: "2026.6.1"
@@ -79,6 +89,15 @@ instances:
     gateway_runtime:
       enabled: true
       bind: loopback
+    auto_onboard:
+      required_env:
+        - OPENCLAW_GATEWAY_BIND
+        - OPENCLAW_GATEWAY_TOKEN
+      openclaw_config:
+        gateway:
+          mode: "$ENV:OPENCLAW_GATEWAY_BIND"
+          auth:
+            token: "$ENV:OPENCLAW_GATEWAY_TOKEN"
     backup_policy:
       enabled: true
       pre_mutation: true

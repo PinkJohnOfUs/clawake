@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass, field
 
@@ -59,13 +60,8 @@ def _build_image_ref(image_spec: ImageSpec) -> str:
     return f"{image_spec.repository}:{image_spec.tag}"
 
 
-def check_image_availability(image_spec: ImageSpec, timeout: int = 30) -> None:
-    """Verify the image is reachable via 'podman manifest inspect'.
-
-    Raises ImageCheckError with a clear reason and actionable hint on failure.
-    Does NOT pull the image; uses manifest inspection only (read-only, fast).
-    """
-    image_ref = _build_image_ref(image_spec)
+def _inspect_manifest(image_ref: str, timeout: int) -> dict:
+    """Inspect a manifest and return the parsed JSON payload."""
     try:
         result = subprocess.run(
             ["podman", "manifest", "inspect", image_ref],
@@ -90,3 +86,39 @@ def check_image_availability(image_spec: ImageSpec, timeout: int = 30) -> None:
         stderr = result.stderr.strip() or result.stdout.strip()
         hint = _classify_stderr(stderr)
         raise ImageCheckError(image_ref=image_ref, reason=stderr, hint=hint)
+
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise ImageCheckError(
+            image_ref=image_ref,
+            reason="Registry returned an invalid manifest payload.",
+            hint="Retry the check and inspect raw podman output for malformed JSON.",
+        ) from exc
+
+
+def check_image_availability(image_spec: ImageSpec, timeout: int = 30) -> None:
+    """Verify the image is reachable via 'podman manifest inspect'.
+
+    Raises ImageCheckError with a clear reason and actionable hint on failure.
+    Does NOT pull the image; uses manifest inspection only (read-only, fast).
+    """
+    image_ref = _build_image_ref(image_spec)
+    pinned_manifest = _inspect_manifest(image_ref, timeout=timeout)
+
+    # Strict mode: when both tag and digest are set, enforce that they resolve to the same manifest.
+    if image_spec.digest:
+        tagged_ref = f"{image_spec.repository}:{image_spec.tag}"
+        tagged_manifest = _inspect_manifest(tagged_ref, timeout=timeout)
+        if tagged_manifest != pinned_manifest:
+            raise ImageCheckError(
+                image_ref=tagged_ref,
+                reason=(
+                    "Tag and digest are inconsistent: "
+                    f"'{image_spec.tag}' does not resolve to '{image_spec.digest}'."
+                ),
+                hint=(
+                    "Update either 'tag' or 'digest' so both point to the same image manifest. "
+                    "Use podman manifest inspect <repo>:<tag> to find the correct digest."
+                ),
+            )

@@ -2,6 +2,7 @@ import json
 import shutil
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from clawake.cli import app
@@ -483,3 +484,156 @@ def test_status_cluster_execute_prints_cause(monkeypatch: object) -> None:
     assert "openclaw-product-owner [product_owner/public] state=healthy rc=0" in result.output
     assert "openclaw-developer [developer/internal] state=failed rc=3" in result.output
     assert "cause: Error: missing API key" in result.output
+
+
+def test_auto_onboard_dry_run() -> None:
+        result = runner.invoke(
+                app,
+                [
+                        "auto-onboard",
+                        "--config",
+                        str(Path("examples/staff/product.yml")),
+                        "--instance",
+                        "excalibot-product-owner",
+                ],
+        )
+
+        assert result.exit_code == 0
+        assert "Auto-onboard plan for excalibot-product-owner" in result.output
+        assert "DRY RUN auto-onboard complete" in result.output
+        assert "Use openclaw --profile public" in result.output
+        assert "models auth login --provider openai --device-code" in result.output
+
+
+def test_auto_onboard_execute_writes_openclaw_json(tmp_path: Path) -> None:
+        env_file = tmp_path / "product-owner.env"
+        env_file.write_text(
+                "\n".join(
+                        [
+                                "OPENCLAW_GATEWAY_BIND=local",
+                                "OPENCLAW_MODEL_PROVIDER=openai",
+                                "OPENCLAW_MODEL=gpt-5.3-codex",
+                                "OPENCLAW_MESSAGING_CHANNEL=discord",
+                                "DISCORD_BOT_TOKEN=test-token",
+                        ]
+                )
+                + "\n",
+                encoding="utf-8",
+        )
+
+        config_root = tmp_path / "cfg"
+        config_root.mkdir(parents=True, exist_ok=True)
+
+        cfg = tmp_path / "product.yml"
+        cfg_data = {
+                "version": 1,
+                "cluster": {"name": "c", "mode": "single_host", "primary_host": "a"},
+                "hosts": [{"name": "a"}],
+                "instances": [
+                        {
+                                "name": "one",
+                                "host": "a",
+                                "role": "developer",
+                                "profile": "internal",
+                                "workspace_path": "/tmp/one/workspace",
+                                "config_path": str(config_root),
+                                "state_path": "/tmp/one/state",
+                                "quadlet_path": "one.container",
+                                "container_name": "one",
+                                "image": {"repository": "ghcr.io/x", "tag": "1"},
+                                "env_files": [str(env_file)],
+                                "auto_onboard": {
+                                        "required_env": [
+                                                "OPENCLAW_MODEL_PROVIDER",
+                                                "OPENCLAW_MODEL",
+                                                "OPENCLAW_MESSAGING_CHANNEL",
+                                        ],
+                                        "openclaw_config": {
+                                                "gateway": {"mode": "$ENV:OPENCLAW_GATEWAY_BIND"},
+                                                "model": {
+                                                        "provider": "$ENV:OPENCLAW_MODEL_PROVIDER",
+                                                        "name": "$ENV:OPENCLAW_MODEL",
+                                                },
+                                                "messaging": {
+                                                        "channel": "$ENV:OPENCLAW_MESSAGING_CHANNEL",
+                                                        "discord": {"bot_token": "$ENV?:DISCORD_BOT_TOKEN"},
+                                                },
+                                        },
+                                },
+                                "dashboard": {"friendly_name": "One"},
+                        }
+                ],
+        }
+        cfg.write_text(yaml.safe_dump(cfg_data), encoding="utf-8")
+
+        result = runner.invoke(
+                app,
+                [
+                        "auto-onboard",
+                        "--config",
+                        str(cfg),
+                        "--instance",
+                        "one",
+                        "--execute",
+                ],
+        )
+
+        assert result.exit_code == 0
+        output_file = config_root / "openclaw.json"
+        assert output_file.exists()
+        payload = json.loads(output_file.read_text(encoding="utf-8"))
+        assert payload["model"]["name"] == "gpt-5.3-codex"
+        assert payload["messaging"]["channel"] == "discord"
+
+
+def test_auto_onboard_fails_when_required_env_missing(tmp_path: Path) -> None:
+        env_file = tmp_path / "product-owner.env"
+        env_file.write_text("OPENCLAW_MODEL_PROVIDER=openai\n", encoding="utf-8")
+
+        cfg = tmp_path / "product.yml"
+        cfg_data = {
+                "version": 1,
+                "cluster": {"name": "c", "mode": "single_host", "primary_host": "a"},
+                "hosts": [{"name": "a"}],
+                "instances": [
+                        {
+                                "name": "one",
+                                "host": "a",
+                                "role": "developer",
+                                "profile": "internal",
+                                "workspace_path": "/tmp/one/workspace",
+                                "config_path": "/tmp/one/config",
+                                "state_path": "/tmp/one/state",
+                                "quadlet_path": "one.container",
+                                "container_name": "one",
+                                "image": {"repository": "ghcr.io/x", "tag": "1"},
+                                "env_files": [str(env_file)],
+                                "auto_onboard": {
+                                        "required_env": ["OPENCLAW_MODEL_PROVIDER", "OPENCLAW_MODEL"],
+                                        "openclaw_config": {
+                                                "model": {
+                                                        "provider": "$ENV:OPENCLAW_MODEL_PROVIDER",
+                                                        "name": "$ENV:OPENCLAW_MODEL",
+                                                }
+                                        },
+                                },
+                                "dashboard": {"friendly_name": "One"},
+                        }
+                ],
+        }
+        cfg.write_text(yaml.safe_dump(cfg_data), encoding="utf-8")
+
+        result = runner.invoke(
+                app,
+                [
+                        "auto-onboard",
+                        "--config",
+                        str(cfg),
+                        "--instance",
+                        "one",
+                ],
+        )
+
+        assert result.exit_code != 0
+        assert "Missing required environment variables" in result.output
+        assert "OPENCLAW_MODEL" in result.output

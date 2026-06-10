@@ -6,10 +6,11 @@ from clawake.config import load_inventory
 
 
 def test_load_example_inventory() -> None:
-    inventory = load_inventory(Path("examples/staff/product.yml"))
-    assert inventory.cluster.mode == "single_host"
-    assert len(inventory.instances) == 2
-    assert {instance.role for instance in inventory.instances} == {"product_owner", "developer"}
+  inventory = load_inventory(Path("examples/staff/product.yml"))
+  assert inventory.cluster.mode == "single_host"
+  assert len(inventory.instances) == 2
+  assert {instance.role for instance in inventory.instances} == {"product_owner", "developer"}
+  assert all(instance.auto_onboard is not None for instance in inventory.instances)
 
 
 def test_port_collision_validation(tmp_path: Path) -> None:
@@ -234,7 +235,7 @@ instances:
     image: {repository: ghcr.io/x, tag: "1"}
     gateway_runtime:
       enabled: true
-      bind: local
+      bind: loopback
     ports:
       - {bind_address: 127.0.0.1, host_port: 9010, container_port: 18789, protocol: tcp}
     dashboard: {friendly_name: One}
