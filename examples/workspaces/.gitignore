@@ -1,0 +1,10 @@
+# Keep workspace templates tracked, ignore all runtime/user-generated workspace content.
+*
+!/.gitignore
+!/README.md
+!/developer/
+!/developer/README.md
+!/developer/ROLE.md
+!/product-owner/
+!/product-owner/README.md
+!/product-owner/ROLE.md

@@ -12,8 +12,6 @@ instances:
     role: product_owner
     profile: public
     workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner
-    config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/product-owner
-    state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/product-owner
     quadlet_path: excalibot-product-owner.container
     container_name: excalibot-product-owner
     image:
@@ -63,8 +61,6 @@ instances:
     role: developer
     profile: internal
     workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer
-    config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/developer
-    state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/developer
     quadlet_path: excalibot-developer.container
     container_name: excalibot-developer
     image:

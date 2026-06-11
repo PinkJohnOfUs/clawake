@@ -11,6 +11,11 @@ def test_load_example_inventory() -> None:
   assert len(inventory.instances) == 2
   assert {instance.role for instance in inventory.instances} == {"product_owner", "developer"}
   assert all(instance.auto_onboard is not None for instance in inventory.instances)
+  for instance in inventory.instances:
+    assert "/.clawake/" not in instance.config_path
+    assert "/.clawake/" not in instance.state_path
+    assert f"/clawake/instances/{instance.name}/" in instance.config_path
+    assert f"/clawake/instances/{instance.name}/" in instance.state_path
 
 
 def test_port_collision_validation(tmp_path: Path) -> None:
@@ -264,8 +269,6 @@ instances:
     role: developer
     profile: internal
     workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/dev
-    config_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-config/dev
-    state_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/clawake-state/dev
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -278,5 +281,40 @@ instances:
     inventory = load_inventory(cfg)
     instance = inventory.instances[0]
     assert instance.workspace_path == "/tmp/project/examples/workspaces/dev"
-    assert instance.config_path == "/tmp/project/examples/clawake-config/dev"
-    assert instance.state_path == "/tmp/project/examples/clawake-state/dev"
+    assert instance.config_path.endswith("/clawake/instances/one/config")
+    assert instance.state_path.endswith("/clawake/instances/one/state")
+    assert "/.clawake/" not in instance.config_path
+    assert "/.clawake/" not in instance.state_path
+
+
+def test_explicit_config_and_state_paths_still_supported(tmp_path: Path) -> None:
+    cfg = tmp_path / "explicit-paths.yaml"
+    cfg.write_text(
+        """
+version: 1
+cluster:
+  name: c
+  mode: single_host
+  primary_host: a
+hosts:
+  - name: a
+instances:
+  - name: one
+    host: a
+    role: developer
+    profile: internal
+    workspace_path: /srv/a/one/workspace
+    config_path: /srv/custom/config
+    state_path: /srv/custom/state
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: ghcr.io/x, tag: "1"}
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+
+    inventory = load_inventory(cfg)
+    instance = inventory.instances[0]
+    assert instance.config_path == "/srv/custom/config"
+    assert instance.state_path == "/srv/custom/state"

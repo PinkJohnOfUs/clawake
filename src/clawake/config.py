@@ -89,8 +89,8 @@ class InstanceSpec(BaseModel):
     role: Literal["product_owner", "developer"]
     profile: Literal["public", "internal"]
     workspace_path: str
-    config_path: str
-    state_path: str
+    config_path: str | None = None
+    state_path: str | None = None
     service_scope: Literal["user"] = "user"
     quadlet_path: str
     container_name: str
@@ -106,6 +106,17 @@ class InstanceSpec(BaseModel):
     gateway_runtime: GatewayRuntimeSpec = Field(default_factory=GatewayRuntimeSpec)
     auto_onboard: AutoOnboardSpec | None = None
     dashboard: DashboardMeta
+
+    @model_validator(mode="after")
+    def ensure_storage_defaults(self) -> InstanceSpec:
+        runtime_root = Path(
+            os.environ.get("CLAWAKE_RUNTIME_ROOT", "~/.local/share/clawake/instances")
+        ).expanduser() / self.name
+        if not self.config_path:
+            self.config_path = str(runtime_root / "config")
+        if not self.state_path:
+            self.state_path = str(runtime_root / "state")
+        return self
 
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:

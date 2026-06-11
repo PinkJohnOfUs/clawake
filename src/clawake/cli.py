@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 import json
 import logging
+import os
 import re
 import shutil
 from pathlib import Path
@@ -12,11 +13,12 @@ import typer
 
 from clawake.config import InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance
-from clawake.services.render import render_instance, render_inventory
+from clawake.services.render import image_ref, render_instance, render_inventory
 from clawake.services.systemd import CommandResult, SystemdService
 from clawake.services.image_check import ImageCheckError, check_image_availability
 from clawake.services.onboarding import (
     AutoOnboardError,
+    AutoOnboardPlan,
     build_auto_onboard_plan,
     write_auto_onboard_config,
 )
@@ -36,9 +38,11 @@ OutputPath = Annotated[Path, typer.Option("--output", "-o")]
 TargetPath = Annotated[Path, typer.Option(..., "--target")]
 ExecuteFlag = Annotated[bool, typer.Option("--execute")]
 InstanceName = Annotated[str, typer.Option(..., "--instance", "-i")]
+OptionalInstanceName = Annotated[str | None, typer.Option("--instance", "-i")]
 TagValue = Annotated[str | None, typer.Option("--tag")]
 DigestValue = Annotated[str | None, typer.Option("--digest")]
 StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
+ForceImageRemoval = Annotated[bool, typer.Option("--force-image")]
 _ENV_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -98,6 +102,19 @@ def _diagnostic_summary(result: CommandResult | None) -> str | None:
             return stripped
     return None
 
+
+def _is_tolerated_teardown_error(result: CommandResult) -> bool:
+    details = "\n".join(part for part in (result.stdout, result.stderr) if part).lower()
+    tolerated_markers = (
+        "not loaded",
+        "not found",
+        "no such container",
+        "no such image",
+        "image not known",
+        "does not exist",
+    )
+    return any(marker in details for marker in tolerated_markers)
+
 def _registry_host(image_ref: str) -> str:
     return image_ref.split("/", 1)[0]
 
@@ -152,6 +169,160 @@ def _validate_env_file(instance_name: str, env_file: str) -> list[str]:
                 f"[ERROR] {instance_name}: invalid env key in {path}:{line_number} ('{key.strip()}')"
             )
     return issues
+
+
+def _prepare_runtime_mounts(instance: InstanceSpec, execute: bool) -> list[str]:
+    actions: list[str] = []
+
+    workspace_path = Path(instance.workspace_path).expanduser()
+    config_dir = Path(instance.config_path).expanduser()
+    state_dir = Path(instance.state_path).expanduser()
+    state_file = state_dir / "openclaw.json"
+
+    if not workspace_path.exists() or not workspace_path.is_dir():
+        raise typer.BadParameter(
+            f"Workspace path missing or not a directory for '{instance.name}': {workspace_path}"
+        )
+
+    for directory in (config_dir, state_dir):
+        if directory.exists() and not directory.is_dir():
+            raise typer.BadParameter(
+                f"Runtime path is not a directory for '{instance.name}': {directory}"
+            )
+        if not directory.exists():
+            if execute:
+                directory.mkdir(parents=True, exist_ok=True)
+                actions.append(f"Prepared runtime directory for {instance.name}: {directory}")
+            else:
+                actions.append(f"DRY RUN prepare runtime directory for {instance.name}: {directory}")
+
+    if state_file.exists() and not state_file.is_file():
+        raise typer.BadParameter(
+            f"Runtime state path is not a regular file for '{instance.name}': {state_file}"
+        )
+
+    if not state_file.exists():
+        if execute:
+            state_file.write_text("{}\n", encoding="utf-8")
+            actions.append(f"Prepared runtime state file for {instance.name}: {state_file}")
+        else:
+            actions.append(f"DRY RUN prepare runtime state file for {instance.name}: {state_file}")
+
+    return actions
+
+
+def _config_contains_required_shape(actual: object, expected: object) -> bool:
+    if expected is None:
+        return True
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return False
+        for key, child in expected.items():
+            if key not in actual:
+                return False
+            if not _config_contains_required_shape(actual[key], child):
+                return False
+        return True
+    if isinstance(expected, list):
+        if not isinstance(actual, list):
+            return False
+        if len(actual) < len(expected):
+            return False
+        for index, child in enumerate(expected):
+            if not _config_contains_required_shape(actual[index], child):
+                return False
+        return True
+    return True
+
+
+def _auto_onboard_needs_repair(instance: InstanceSpec, plan: AutoOnboardPlan) -> bool:
+    if not instance.auto_onboard or not instance.auto_onboard.enabled:
+        return False
+
+    target_path = plan.target_path
+    if not target_path.exists() or not target_path.is_file():
+        return True
+
+    try:
+        payload = json.loads(target_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return True
+
+    if not isinstance(payload, dict):
+        return True
+    return not _config_contains_required_shape(payload, plan.config)
+
+
+def _repair_runtime_state_file(instance: InstanceSpec, execute: bool) -> list[str]:
+    actions: list[str] = []
+    state_dir = Path(instance.state_path).expanduser()
+    state_file = state_dir / "openclaw.json"
+
+    if state_file.exists() and not state_file.is_file():
+        raise typer.BadParameter(
+            f"Runtime state path is not a regular file for '{instance.name}': {state_file}"
+        )
+
+    for stale_candidate in sorted(state_dir.glob("openclaw.json.unreadable*")):
+        if execute:
+            stale_candidate.unlink(missing_ok=True)
+            actions.append(
+                f"Removed stale runtime state artifact for {instance.name}: {stale_candidate}"
+            )
+        else:
+            actions.append(
+                f"DRY RUN remove stale runtime state artifact for {instance.name}: {stale_candidate}"
+            )
+
+    if not state_file.exists():
+        return actions
+
+    current_uid = os.getuid()
+    current_gid = os.getgid()
+    stat_result = state_file.stat()
+    needs_repair = False
+    reasons: list[str] = []
+
+    if stat_result.st_uid != current_uid or stat_result.st_gid != current_gid:
+        needs_repair = True
+        reasons.append(
+            f"owner {stat_result.st_uid}:{stat_result.st_gid} != {current_uid}:{current_gid}"
+        )
+
+    payload = "{}\n"
+    read_error: OSError | None = None
+    try:
+        payload = state_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        needs_repair = True
+        read_error = exc
+        reasons.append(f"unreadable ({exc})")
+
+    if not needs_repair:
+        return actions
+
+    reason_text = ", ".join(reasons)
+    if not execute:
+        actions.append(
+            f"DRY RUN repair runtime state file for {instance.name}: {state_file} ({reason_text})"
+        )
+        return actions
+
+    temp_state_file = state_file.with_name(f".{state_file.name}.clawake-repair")
+    temp_state_file.write_text(payload, encoding="utf-8")
+    temp_state_file.chmod(0o600)
+    temp_state_file.replace(state_file)
+    if read_error is not None:
+        actions.append(
+            f"Repaired runtime state file for {instance.name}: {state_file} "
+            f"(fallback payload due to read error: {read_error})"
+        )
+    else:
+        actions.append(
+            f"Repaired runtime state file for {instance.name}: {state_file} ({reason_text})"
+        )
+
+    return actions
 
 
 @app.command()
@@ -287,6 +458,10 @@ def apply(
 
     if not execute:
         for instance, _, _ in changed:
+            for action in _prepare_runtime_mounts(instance, execute=False):
+                typer.echo(action)
+            for action in _repair_runtime_state_file(instance, execute=False):
+                typer.echo(action)
             if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
                 archive = backup_instance(
                     instance,
@@ -299,8 +474,14 @@ def apply(
 
     service = SystemdService()
     failed = False
+    restart_targets: list[str] = []
 
     for instance, rendered_file, destination in changed:
+        for action in _prepare_runtime_mounts(instance, execute=True):
+            typer.echo(action)
+        for action in _repair_runtime_state_file(instance, execute=True):
+            typer.echo(action)
+
         if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
             archive = backup_instance(instance, output_dir=Path(".backups/instances"), execute=True)
             typer.echo(f"Backup created for {instance.name}: {archive}")
@@ -308,17 +489,46 @@ def apply(
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(rendered_file, destination)
         typer.echo(f"Deployed {rendered_file} -> {destination}")
+        restart_targets.append(instance.name)
+
+    auto_onboard_repairs: list[tuple[InstanceSpec, AutoOnboardPlan]] = []
+    for instance in inventory.instances:
+        if not instance.auto_onboard or not instance.auto_onboard.enabled:
+            continue
+        try:
+            plan = build_auto_onboard_plan(instance)
+        except AutoOnboardError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
+        if plan.missing_required_env:
+            missing = ", ".join(plan.missing_required_env)
+            raise typer.BadParameter(
+                f"Missing required environment variables for auto-onboard instance '{instance.name}': {missing}"
+            )
+
+        needs_repair = _auto_onboard_needs_repair(instance, plan)
+        if needs_repair:
+            auto_onboard_repairs.append((instance, plan))
+
+    if auto_onboard_repairs:
+        for instance, plan in auto_onboard_repairs:
+            write_auto_onboard_config(plan, execute=True)
+            typer.echo(
+                f"Auto-onboard repaired runtime config for {instance.name}: {plan.target_path}"
+            )
+            if instance.name not in restart_targets:
+                restart_targets.append(instance.name)
 
     reload_result = service.daemon_reload(execute=True)
     _print_result(reload_result)
     failed = failed or reload_result.return_code != 0
 
-    if not changed:
+    if not changed and not auto_onboard_repairs:
         typer.echo("No rendered changes detected; daemon-reload completed.")
 
-    if changed:
-        for instance, _, _ in changed:
-            restart_result = service.restart(instance.name, execute=True)
+    if restart_targets:
+        for instance_name in restart_targets:
+            restart_result = service.restart(instance_name, execute=True)
             _print_result(restart_result)
             failed = failed or restart_result.return_code != 0
 
@@ -552,6 +762,89 @@ def rollback(
         f"Rolled back {plan.instance}: "
         f"{plan.previous_tag}@{plan.previous_digest} -> {plan.next_tag}@{plan.next_digest}"
     )
+
+
+@app.command()
+def teardown(
+    config: ConfigPath,
+    instance: OptionalInstanceName = None,
+    execute: ExecuteFlag = False,
+    force_image: ForceImageRemoval = False,
+) -> None:
+    """Remove managed services, containers, and images for one or all instances."""
+    inventory = _load(config)
+    selected = inventory.instances
+    if instance is not None:
+        selected = [_instance_by_name(inventory, instance)]
+
+    if not selected:
+        typer.echo("No matching instances selected for teardown")
+        return
+
+    host_map = {host.name: host for host in inventory.hosts}
+    service = SystemdService()
+    failed = False
+
+    image_usage: dict[str, int] = {}
+    selected_image_usage: dict[str, int] = {}
+    for known_instance in inventory.instances:
+        ref = image_ref(known_instance)
+        image_usage[ref] = image_usage.get(ref, 0) + 1
+    for chosen in selected:
+        ref = image_ref(chosen)
+        selected_image_usage[ref] = selected_image_usage.get(ref, 0) + 1
+
+    typer.echo(
+        f"Teardown plan for cluster '{inventory.cluster.name}': {len(selected)} instance(s) "
+        f"(execute={execute}, force_image={force_image})"
+    )
+
+    for chosen in selected:
+        host = host_map[chosen.host]
+        quadlet_target = Path(host.quadlet_root).expanduser() / chosen.quadlet_path
+
+        typer.echo(f"- Teardown {chosen.name} [{chosen.role}/{chosen.profile}]")
+        results = [
+            service.stop(chosen.name, execute=execute),
+            service.disable(chosen.name, execute=execute),
+            service.remove_quadlet(str(quadlet_target), execute=execute),
+            service.remove_container(chosen.container_name, execute=execute),
+        ]
+        for result in results:
+            _print_result(result)
+            if result.return_code != 0 and not _is_tolerated_teardown_error(result):
+                failed = True
+
+    reload_result = service.daemon_reload(execute=execute)
+    _print_result(reload_result)
+    if reload_result.return_code != 0:
+        failed = True
+
+    for ref, selected_users in selected_image_usage.items():
+        total_users = image_usage.get(ref, 0)
+        if not force_image and selected_users < total_users:
+            typer.secho(
+                f"Skipping image removal for {ref}: still used by {total_users - selected_users} other instance(s). "
+                "Use --force-image to override.",
+                fg="yellow",
+                err=True,
+            )
+            continue
+
+        result = service.remove_image(ref, execute=execute)
+        _print_result(result)
+        if result.return_code != 0 and not _is_tolerated_teardown_error(result):
+            failed = True
+
+    if not execute:
+        typer.echo("DRY RUN teardown complete. Re-run with --execute to mutate state.")
+        return
+
+    if failed:
+        raise typer.Exit(code=1)
+
+
+app.command("remove")(teardown)
 
 
 if __name__ == "__main__":

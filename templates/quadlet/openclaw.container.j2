@@ -6,12 +6,11 @@ Wants=network-online.target
 [Container]
 ContainerName={{ instance.container_name }}
 Image={{ image_ref }}
-UserNS=keep-id
+UserNS=keep-id:uid=1000,gid=1000
 {% for env_file in instance.env_files %}
 EnvironmentFile={{ env_file }}
 {% endfor %}
 Volume={{ instance.workspace_path }}:/workspace
-Volume={{ instance.config_path }}/openclaw.json:/home/node/.openclaw-{{ instance.profile }}/openclaw.json
 Volume={{ instance.state_path }}:/home/node/.openclaw-{{ instance.profile }}
 {% for mount in instance.mounts %}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}

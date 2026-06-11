@@ -121,8 +121,8 @@ def build_auto_onboard_plan(instance: InstanceSpec) -> AutoOnboardPlan:
             f"Run: openclaw --profile {instance.profile} models auth login --provider openai --device-code"
         )
 
-    target = Path(instance.config_path).expanduser() / "openclaw.json"
-    backup = Path(instance.config_path).expanduser() / "openclaw.json.last-good"
+    target = Path(instance.state_path).expanduser() / "openclaw.json"
+    backup = Path(instance.state_path).expanduser() / "openclaw.json.last-good"
     return AutoOnboardPlan(
         instance=instance.name,
         target_path=target,

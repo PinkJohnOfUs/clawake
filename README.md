@@ -51,6 +51,18 @@ make plan CONFIG=examples/staff/product.yml OUTPUT=.rendered
 
 `examples/staff/product.yml` uses `${CLAWAKE_WORKSPACE_ROOT}` so paths stay portable across checkouts.
 
+### Migration note: host runtime storage defaults
+
+`clawake` treats `workspace_path` as mounted project input, while runtime config/state defaults live outside the workspace.
+
+- `config_path` and `state_path` are optional.
+- If omitted, they are derived automatically as:
+	- `~/.local/share/clawake/instances/<instance-name>/config`
+	- `~/.local/share/clawake/instances/<instance-name>/state`
+- Override the root with `CLAWAKE_RUNTIME_ROOT` when needed.
+- `make` targets in this repository set `CLAWAKE_RUNTIME_ROOT=$PWD/.clawake/instances` by default, so local runs keep runtime state in the project scope.
+- Existing staff files that still define explicit `config_path`/`state_path` continue to work.
+
 For local CLI usage, set it once per shell:
 
 ```bash
@@ -77,6 +89,9 @@ In CI, set `CLAWAKE_WORKSPACE_ROOT` to the repository workspace path.
 - `clawake status <instance> [--execute]`
 - `clawake status-cluster --config|-c <staff.yaml> [--format text|json] [--execute]`
 - `clawake logs <instance> [--lines <N>] [--execute]`
+- `clawake auto-onboard --config|-c <staff.yaml> --instance|-i <name> [--execute]`
+- `clawake teardown --config|-c <staff.yaml> [--instance|-i <name>] [--force-image] [--execute]`
+- `clawake remove --config|-c <staff.yaml> [--instance|-i <name>] [--force-image] [--execute]` (alias for `teardown`)
 
 ### Backup and image lifecycle
 

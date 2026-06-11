@@ -4,14 +4,16 @@ OUTPUT ?= .rendered
 TARGET ?= $(HOME)/.config/containers/systemd
 INSTANCE ?= excalibot-product-owner
 CLAWAKE_WORKSPACE_ROOT ?= $(CURDIR)
+CLAWAKE_RUNTIME_ROOT ?= $(CURDIR)/.clawake/instances
 
 export CLAWAKE_WORKSPACE_ROOT
+export CLAWAKE_RUNTIME_ROOT
 
 CLAWAKE_RUN = $(UV) run clawake
 
 .PHONY: uv-sync install-dev install-tool uninstall-tool doctor \
 	validate render plan deploy deploy-exec apply apply-exec auto-onboard auto-onboard-exec \
-	status-cluster test lint fmt
+	status-cluster teardown-example teardown-example-exec test lint fmt
 
 uv-sync: ## Install project dependencies into .venv via uv
 	$(UV) sync
@@ -56,6 +58,12 @@ auto-onboard-exec: ## Execute auto-onboard for INSTANCE
 
 status-cluster: ## Check status-cluster in text format
 	$(CLAWAKE_RUN) status-cluster -c $(CONFIG) --format text --execute
+
+teardown-example: ## Dry-run teardown for examples/staff/product.yml
+	$(CLAWAKE_RUN) teardown -c examples/staff/product.yml
+
+teardown-example-exec: ## Execute teardown for examples/staff/product.yml (all instances)
+	$(CLAWAKE_RUN) teardown -c examples/staff/product.yml --execute
 
 test: ## Run pytest
 	$(UV) run pytest

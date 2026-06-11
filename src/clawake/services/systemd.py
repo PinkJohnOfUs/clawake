@@ -37,6 +37,12 @@ class SystemdService:
     def daemon_reload(self, execute: bool = False) -> CommandResult:
         return self._run(["systemctl", "--user", "daemon-reload"], execute)
 
+    def stop(self, instance_name: str, execute: bool = False) -> CommandResult:
+        return self._run(["systemctl", "--user", "stop", self.unit_name(instance_name)], execute)
+
+    def disable(self, instance_name: str, execute: bool = False) -> CommandResult:
+        return self._run(["systemctl", "--user", "disable", self.unit_name(instance_name)], execute)
+
     def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
         return self._run(["systemctl", "--user", "restart", self.unit_name(instance_name)], execute)
 
@@ -48,3 +54,12 @@ class SystemdService:
             ["journalctl", "--user-unit", self.unit_name(instance_name), "-n", str(lines)],
             execute,
         )
+
+    def remove_quadlet(self, quadlet_path: str, execute: bool = False) -> CommandResult:
+        return self._run(["rm", "-f", quadlet_path], execute)
+
+    def remove_container(self, container_name: str, execute: bool = False) -> CommandResult:
+        return self._run(["podman", "rm", "-f", container_name], execute)
+
+    def remove_image(self, image_ref: str, execute: bool = False) -> CommandResult:
+        return self._run(["podman", "image", "rm", image_ref], execute)
