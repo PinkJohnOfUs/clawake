@@ -63,6 +63,12 @@ make plan CONFIG=examples/staff/product.yml OUTPUT=.rendered
 - `make` targets in this repository set `CLAWAKE_RUNTIME_ROOT=$PWD/.clawake/instances` by default, so local runs keep runtime state in the project scope.
 - Existing staff files that still define explicit `config_path`/`state_path` continue to work.
 
+Runtime workspace note:
+
+- OpenClaw runtime workspace data is persisted under `state_path/workspace-<profile>` and mounted in-container at `/home/node/.openclaw/workspace-<profile>`.
+- `workspace_path` remains mounted at `/workspace` as host-owned project input.
+- This design keeps runtime-mutated agent workspace state out of git-tracked source workspaces while surviving service restarts.
+
 For local CLI usage, set it once per shell:
 
 ```bash

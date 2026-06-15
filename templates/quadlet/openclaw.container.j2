@@ -12,6 +12,7 @@ EnvironmentFile={{ env_file }}
 {% endfor %}
 Volume={{ instance.workspace_path }}:/workspace
 Volume={{ instance.state_path }}:/home/node/.openclaw-{{ instance.profile }}
+Volume={{ instance.state_path }}/workspace-{{ instance.profile }}:/home/node/.openclaw/workspace-{{ instance.profile }}
 {% for mount in instance.mounts %}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
 {% endfor %}

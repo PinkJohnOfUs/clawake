@@ -26,12 +26,6 @@ This document contains general project documentation that was previously in the 
 ├── examples/workspaces/
 │   ├── developer/
 │   └── product-owner/
-├── examples/clawake-config/
-│   ├── developer/
-│   └── product-owner/
-├── examples/clawake-state/
-│   ├── developer/
-│   └── product-owner/
 ├── staff/
 │   └── README.md
 ├── templates/quadlet/
@@ -81,7 +75,7 @@ Why these top-level parts exist:
 Staff model highlights:
 - Cluster root for single-host mode (`cluster.name`, `cluster.mode=single_host`, `cluster.primary_host`).
 - Instance identity (`name`, `host`, `role`, `profile`, `container_name`, `quadlet_path`).
-- Explicit per-instance storage paths (`workspace_path`, `config_path`, `state_path`).
+- Workspace-as-input model (`workspace_path` required; `config_path` and `state_path` optional host runtime overrides).
 - Image source controls (`repository`, `tag`, `digest`, `known_good_digest`).
 - Runtime details (`ports`, bind address, mounts, env files, labels).
 - Operational policies (health expectations, update policy, backup policy).

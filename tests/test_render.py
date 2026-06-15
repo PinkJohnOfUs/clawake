@@ -18,4 +18,8 @@ def test_render_contains_expected_container_data() -> None:
     assert "/examples/workspaces/product-owner:/workspace" in rendered
     assert "/openclaw.json:/home/node/.openclaw-public/openclaw.json" not in rendered
     assert f"{instance.state_path}:/home/node/.openclaw-public" in rendered
+    assert (
+        f"{instance.state_path}/workspace-public:/home/node/.openclaw/workspace-public"
+        in rendered
+    )
     assert "Exec=openclaw --profile public gateway run --bind loopback --port 18789" in rendered

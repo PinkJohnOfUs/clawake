@@ -30,6 +30,13 @@
 - Rootless/systemd-user assumptions are first-class.
 - Human-readable errors for non-specialists.
 
+## Workspace and state boundaries
+
+- `workspace_path` is host-owned source input mounted at `/workspace`.
+- Runtime-mutated OpenClaw workspace data is persisted under `state_path/workspace-<profile>` and mounted at `/home/node/.openclaw/workspace-<profile>`.
+- This split prevents attestations and runtime workspace history from becoming orphaned across restarts while preserving a stable source workspace contract for staff-managed files (for example `ROLE.md`).
+- The `state_path` remains the mutable runtime boundary (config, sessions, plugin state, attestations, runtime workspace).
+
 ## Current MVP workflows
 
 - `clawake apply` provides validate → render → deploy with dry-run by default.

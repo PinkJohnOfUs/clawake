@@ -567,6 +567,7 @@ def test_apply_execute_prepares_runtime_mount_paths(monkeypatch: object, tmp_pat
         assert result.exit_code == 0
         assert config_path.is_dir()
         assert state_path.is_dir()
+        assert (state_path / "workspace-internal").is_dir()
         assert (state_path / "openclaw.json").is_file()
 
 

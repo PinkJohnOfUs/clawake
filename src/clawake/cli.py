@@ -177,6 +177,7 @@ def _prepare_runtime_mounts(instance: InstanceSpec, execute: bool) -> list[str]:
     workspace_path = Path(instance.workspace_path).expanduser()
     config_dir = Path(instance.config_path).expanduser()
     state_dir = Path(instance.state_path).expanduser()
+    runtime_workspace_dir = state_dir / f"workspace-{instance.profile}"
     state_file = state_dir / "openclaw.json"
 
     if not workspace_path.exists() or not workspace_path.is_dir():
@@ -184,7 +185,7 @@ def _prepare_runtime_mounts(instance: InstanceSpec, execute: bool) -> list[str]:
             f"Workspace path missing or not a directory for '{instance.name}': {workspace_path}"
         )
 
-    for directory in (config_dir, state_dir):
+    for directory in (config_dir, state_dir, runtime_workspace_dir):
         if directory.exists() and not directory.is_dir():
             raise typer.BadParameter(
                 f"Runtime path is not a directory for '{instance.name}': {directory}"
