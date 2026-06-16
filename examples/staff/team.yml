@@ -10,8 +10,8 @@ instances:
   - name: excalibot-product-owner
     host: solo-host
     role: product_owner
-    profile: public
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner/workspace
+    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner/role
     quadlet_path: excalibot-product-owner.container
     container_name: excalibot-product-owner
     image:
@@ -46,6 +46,8 @@ instances:
         channels:
           discord:
             token: "$ENV?:DISCORD_BOT_TOKEN"
+            server_id: "$ENV?:DISCORD_SERVER_ID"
+            channel_id: "$ENV?:DISCORD_CHANNEL_ID"
     backup_policy:
       enabled: true
       pre_mutation: true
@@ -59,8 +61,8 @@ instances:
   - name: excalibot-developer
     host: solo-host
     role: developer
-    profile: internal
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer/workspace
+    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer/role
     quadlet_path: excalibot-developer.container
     container_name: excalibot-developer
     image:

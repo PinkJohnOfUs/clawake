@@ -15,7 +15,7 @@ def _load_image(config: Path, instance_name: str) -> dict[str, str]:
 
 
 def test_build_upgrade_plan() -> None:
-    config = Path("examples/staff/product.yml")
+    config = Path("examples/staff/team.yml")
     image = _load_image(config, "openclaw-product-owner")
     plan = build_upgrade_plan(
         config,
@@ -29,7 +29,7 @@ def test_build_upgrade_plan() -> None:
 
 
 def test_apply_upgrade_and_rollback(tmp_path: Path) -> None:
-    src = Path("examples/staff/product.yml")
+    src = Path("examples/staff/team.yml")
     config = tmp_path / "product.yml"
     config.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     original_image = _load_image(config, "openclaw-product-owner")
@@ -49,6 +49,6 @@ def test_apply_upgrade_and_rollback(tmp_path: Path) -> None:
 
 
 def test_upgrade_plan_unknown_instance_raises() -> None:
-    config = Path("examples/staff/product.yml")
+    config = Path("examples/staff/team.yml")
     with pytest.raises(ValueError):
         build_upgrade_plan(config, "missing", next_tag=None, next_digest=None)

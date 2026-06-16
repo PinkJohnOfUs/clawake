@@ -17,9 +17,9 @@ Preferred for contributors (repo-local and reproducible):
 
 ```bash
 make install-dev
-make validate
-make render
-make plan
+make doctor
+make setup-quadlets
+make status-quadlets
 ```
 
 This uses `uv run clawake ...` against the project environment and avoids global drift.
@@ -40,34 +40,66 @@ make uninstall-tool
 Useful overrides:
 
 ```bash
-make validate CONFIG=examples/staff/product.yml
-make render CONFIG=examples/staff/product.yml OUTPUT=.rendered
-make plan CONFIG=examples/staff/product.yml OUTPUT=.rendered
+make setup-quadlets CONFIG=examples/staff/team.yml
+make setup-quadlets MEMBER=product-owner
+make status-quadlets-json CONFIG=examples/staff/team.yml
 ```
+
+## New Workflow (Phase 1 MVP)
+
+The current lifecycle is team/member oriented and built around Quadlet reconciliation.
+
+1. Prepare environment and dependencies:
+
+	```bash
+	export CLAWAKE_WORKSPACE_ROOT="$PWD"
+	make install-dev
+	```
+
+2. Preview changes (safe dry-run):
+
+	```bash
+	make setup-quadlets CONFIG=examples/staff/team.yml
+	```
+
+3. Apply changes (mutating):
+
+	```bash
+	make setup-quadlets-exec CONFIG=examples/staff/team.yml
+	```
+
+4. Check runtime health:
+
+	```bash
+	make status-quadlets CONFIG=examples/staff/team.yml
+	```
+
+5. Restart after config/image updates (optional):
+
+	```bash
+	make restart-quadlets-exec CONFIG=examples/staff/team.yml
+	```
+
+6. Teardown when needed:
+
+	```bash
+	make teardown-quadlets-exec CONFIG=examples/staff/team.yml
+	```
 
 ## CLI Reference
 
 ### Portable staff paths
 
-`examples/staff/product.yml` uses `${CLAWAKE_WORKSPACE_ROOT}` so paths stay portable across checkouts.
+`examples/staff/team.yml` uses `${CLAWAKE_WORKSPACE_ROOT}` so paths stay portable across checkouts.
 
-### Migration note: host runtime storage defaults
+### Simplified mount model
 
-`clawake` treats `workspace_path` as mounted project input, while runtime config/state defaults live outside the workspace.
+`clawake` uses exactly two host paths per instance:
 
-- `config_path` and `state_path` are optional.
-- If omitted, they are derived automatically as:
-	- `~/.local/share/clawake/instances/<instance-name>/config`
-	- `~/.local/share/clawake/instances/<instance-name>/state`
-- Override the root with `CLAWAKE_RUNTIME_ROOT` when needed.
-- `make` targets in this repository set `CLAWAKE_RUNTIME_ROOT=$PWD/.clawake/instances` by default, so local runs keep runtime state in the project scope.
-- Existing staff files that still define explicit `config_path`/`state_path` continue to work.
+- `workspace_path`: mounted at `/workspace` for runtime work.
+- `team_definition_path`: mounted read-only at `/team-definition`.
 
-Runtime workspace note:
-
-- OpenClaw runtime workspace data is persisted under `state_path/workspace-<profile>` and mounted in-container at `/home/node/.openclaw/workspace-<profile>`.
-- `workspace_path` remains mounted at `/workspace` as host-owned project input.
-- This design keeps runtime-mutated agent workspace state out of git-tracked source workspaces while surviving service restarts.
+OpenClaw runtime state is written under `workspace_path/.openclaw`.
 
 For local CLI usage, set it once per shell:
 
@@ -78,40 +110,31 @@ export CLAWAKE_WORKSPACE_ROOT="$PWD"
 In VS Code launch configurations, set `CLAWAKE_WORKSPACE_ROOT` to `${workspaceFolder}`.
 In CI, set `CLAWAKE_WORKSPACE_ROOT` to the repository workspace path.
 
-### Validate and render
+### Lifecycle commands
 
-- `clawake validate --config|-c <staff.yaml>`
-- `clawake render --config|-c <staff.yaml> [--output|-o <render-dir>]`
-- `clawake plan --config|-c <staff.yaml> [--output|-o <render-dir>]`
+- `clawake setup-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+- `clawake restart-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+- `clawake status-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--format text|json]`
+- `clawake teardown-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
 
-### Deploy and reconcile
+### Makefile shortcuts
 
-- `clawake deploy --config|-c <staff.yaml> --target <quadlet-dir> [--execute]`
-- `clawake apply --config|-c <staff.yaml> --target <quadlet-dir> [--output|-o <render-dir>] [--execute]`
-
-### Service operations
-
-- `clawake restart <instance> [--execute]`
-- `clawake status <instance> [--execute]`
-- `clawake status-cluster --config|-c <staff.yaml> [--format text|json] [--execute]`
-- `clawake logs <instance> [--lines <N>] [--execute]`
-- `clawake auto-onboard --config|-c <staff.yaml> --instance|-i <name> [--execute]`
-- `clawake teardown --config|-c <staff.yaml> [--instance|-i <name>] [--force-image] [--execute]`
-- `clawake remove --config|-c <staff.yaml> [--instance|-i <name>] [--force-image] [--execute]` (alias for `teardown`)
-
-### Backup and image lifecycle
-
-- `clawake backup --config|-c <staff.yaml> --instance|-i <name> [--output|-o <backup-dir>] [--execute]`
-- `clawake upgrade --config|-c <staff.yaml> --instance|-i <name> [--tag <tag>] [--digest <sha256:...>] [--execute]`
-- `clawake rollback --config|-c <staff.yaml> --instance|-i <name> [--execute]`
+- `make setup-quadlets`
+- `make setup-quadlets-exec`
+- `make restart-quadlets`
+- `make restart-quadlets-exec`
+- `make status-quadlets`
+- `make status-quadlets-json`
+- `make teardown-quadlets`
+- `make teardown-quadlets-exec`
+- `make test-lifecycle`
 
 ### Parameter behavior
 
 - `--execute`: required for commands that mutate host state/config.
-- `--output/-o`: render or backup output directory (command-dependent).
-- `--target`: target Quadlet directory for deployment/apply.
-- `--format`: output format for `status-cluster` (`text` or `json`).
-- `--lines`: journal line count for `logs` (default: `100`).
+- `--config/-c`: team inventory file (for example `examples/staff/team.yml`).
+- `--member/-m`: scope operation to one member instead of the whole team.
+- `--format`: output format for `status-quadlets` (`text` or `json`).
 
 ## Documentation
 

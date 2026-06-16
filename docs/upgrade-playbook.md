@@ -1,20 +1,23 @@
 # Upgrade Playbook (MVP)
 
-1. Validate staff file:
-   - `clawake validate -c examples/staff/product.yml`
-2. Render and inspect changes:
-   - `clawake plan -c examples/staff/product.yml -o .rendered/product`
-3. Create backup for target instance:
-   - `clawake backup -c examples/staff/product.yml -i openclaw-prod -o .backups --execute`
-4. Deploy rendered Quadlet:
-   - `clawake deploy -c examples/staff/product.yml --target ~/.config/containers/systemd --execute`
-5. Reload and restart service:
-   - `clawake restart openclaw-prod --execute`
-6. Verify health/logs:
-   - `clawake status openclaw-prod --execute`
-   - `clawake logs openclaw-prod --execute --lines 200`
-7. If unhealthy, rollback to known-good digest and redeploy.
+This playbook follows the lifecycle-first operator model.
 
-## Rollback concept
+1. Validate team definition:
+   - `clawake validate -c examples/staff/team.yml`
+2. Apply or refresh Quadlet definitions:
+   - `clawake setup-quadlets -c examples/staff/team.yml`
+3. Restart impacted services:
+   - `clawake restart-quadlets -c examples/staff/team.yml`
+4. Verify runtime status:
+   - `clawake status-quadlets -c examples/staff/team.yml`
+5. If needed, remove and re-setup affected members:
+   - `clawake teardown-quadlets -c examples/staff/team.yml --member <name>`
+   - `clawake setup-quadlets -c examples/staff/team.yml --member <name>`
 
-Store known-good digest in the staff file (`image.known_good_digest`) and revert to it during rollback workflows.
+## Recovery concept
+
+Recovery should be deterministic and explicit:
+
+- Keep image provenance in the staff file (`tag` and optional `digest`).
+- Reconcile by running `setup-quadlets` followed by `restart-quadlets`.
+- Use `status-quadlets` as the canonical health checkpoint.

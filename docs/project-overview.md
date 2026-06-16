@@ -5,10 +5,10 @@ This document contains general project documentation that was previously in the 
 ## Concise architectural recommendation
 
 - Keep staff files in git as source of truth (`staff/` + `examples/staff/`).
-- Keep operational logic in `src/clawake/services/`; keep CLI thin.
-- Default workflows to safe preview/dry-run.
-- Require explicit `--execute` for mutation (`deploy`/`apply`/`restart`/`upgrade`/`rollback`).
-- Use simple local state first (files + tar backups), no DB in MVP.
+- Keep operational logic in `src/clawake/services/`; keep CLI thin and user-intent driven.
+- Focus on team lifecycle operations over infrastructure verbs.
+- Keep default workflows safe and predictable, with explicit mutation steps.
+- Use simple local state first (filesystem, deterministic rendered artifacts), no DB in MVP.
 - Reuse services for a future FastAPI dashboard layer.
 
 ## Proposed repository tree
@@ -22,10 +22,9 @@ This document contains general project documentation that was previously in the 
 │   ├── repo-roadmap.md
 │   └── upgrade-playbook.md
 ├── examples/staff/
-│   └── product.yml
-├── examples/workspaces/
-│   ├── developer/
-│   └── product-owner/
+│   ├── team.yml
+│   ├── env/
+│   └── workspaces/
 ├── staff/
 │   └── README.md
 ├── templates/quadlet/
@@ -35,7 +34,6 @@ This document contains general project documentation that was previously in the 
 │   ├── cli.py
 │   ├── config.py
 │   └── services/
-│       ├── backup.py
 │       ├── render.py
 │       ├── systemd.py
 │       └── upgrade.py
@@ -74,15 +72,15 @@ Why these top-level parts exist:
 
 Staff model highlights:
 - Cluster root for single-host mode (`cluster.name`, `cluster.mode=single_host`, `cluster.primary_host`).
-- Instance identity (`name`, `host`, `role`, `profile`, `container_name`, `quadlet_path`).
-- Workspace-as-input model (`workspace_path` required; `config_path` and `state_path` optional host runtime overrides).
+- Instance identity (`name`, `host`, `role`, `container_name`, `quadlet_path`).
+- Two-path mount model (`workspace_path` + `team_definition_path`).
 - Image source controls (`repository`, `tag`, `digest`, `known_good_digest`).
 - Runtime details (`ports`, bind address, mounts, env files, labels).
-- Operational policies (health expectations, update policy, backup policy).
+- Operational policies (health expectations, update policy, guardrails).
 - Dashboard metadata/friendly labels.
 
 Examples:
-- `examples/staff/product.yml`
+- `examples/staff/team.yml`
 
 Path convention:
 - Use `${CLAWAKE_WORKSPACE_ROOT}` in staff files for repository-relative absolute paths.
@@ -93,7 +91,18 @@ Path convention:
 - Core behavior is in services and should stay UI-agnostic.
 - CLI is orchestration over the service layer.
 - Future dashboard routes should call the same services.
-- `status-cluster --format json` is the machine-readable status contract.
+- `status-quadlets --format json` is the machine-readable status contract.
+
+## Primary lifecycle interface
+
+The preferred operator interface is a small, intent-first command set:
+
+- `setup-quadlets`
+- `restart-quadlets`
+- `teardown-quadlets`
+- `status-quadlets`
+
+Other commands should align with the same mental model and avoid exposing runtime internals.
 
 Suggested MVP dashboard capabilities:
 - List instances and friendly labels.
@@ -114,11 +123,13 @@ Suggested MVP dashboard capabilities:
 
 ## Next milestone tasks
 
-- [ ] Harden `upgrade` and `rollback` command flows.
+- [ ] Harden `setup-quadlets` reconciliation diagnostics for partial-failure reporting.
+- [ ] Add policy checks for unsafe host path selections in staff inventory.
+- [ ] Add preview diff summary for Quadlet changes before `--execute`.
+- [ ] Add stricter guardrails for team-wide mutating operations.
 - [ ] Add host-specific override merge behavior.
 - [ ] Add preflight networking collision detection against live host state.
 - [ ] Add explicit digest pinning policy checks.
-- [ ] Add backup retention cleanup workflow.
 - [ ] Add deployment state snapshot file format.
 - [ ] Add structured JSON output mode for CLI.
 - [ ] Add FastAPI read-only dashboard prototype.
@@ -134,4 +145,13 @@ uv sync --dev
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest -q
+```
+
+Preferred lifecycle smoke flow:
+
+```bash
+make setup-quadlets
+make setup-quadlets-exec
+make status-quadlets
+make teardown-quadlets
 ```

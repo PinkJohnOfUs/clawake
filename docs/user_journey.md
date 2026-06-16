@@ -15,59 +15,71 @@ Ich nutze Clawake als Stakeholder unseres Produkts. Ich denke in Mitarbeitern: j
 - Mitarbeiterdefinitionen liegen als staff-Dateien vor.
 - Beispiele liegen unter `examples/staff/`.
 - Betriebskonfigurationen liegen unter `staff/`.
+- Der Betrieb erfolgt ueber einen kleinen Satz klarer Lifecycle-Kommandos.
 
-## Erste Journey-Etappe (README 13-17)
+## Erste Journey-Etappe: Lifecycle zuerst
 
-Startpunkt sind die Befehle fuer Validate, Render und Plan.
+Startpunkt sind die vier zentralen Kommandos aus der Architektur:
 
 0. `make install-dev`
-1. `clawake validate --config|-c <staff.yaml>`
-2. `clawake render --config|-c <staff.yaml> [--output|-o <render-dir>]`
-3. `clawake plan --config|-c <staff.yaml> [--output|-o <render-dir>]`
+1. `clawake setup-quadlets --config|-c <staff.yaml>` (Preview)
+2. `clawake setup-quadlets --config|-c <staff.yaml> --execute` (Mutation)
+3. `clawake restart-quadlets --config|-c <staff.yaml>` (Preview)
+4. `clawake restart-quadlets --config|-c <staff.yaml> [--member <name>] --execute` (Mutation)
+5. `clawake status-quadlets --config|-c <staff.yaml> [--format text|json]`
+6. `clawake teardown-quadlets --config|-c <staff.yaml> [--member <name>]` (Preview)
+7. `clawake teardown-quadlets --config|-c <staff.yaml> [--member <name>] --execute` (Mutation)
 
 Ziel dieser Etappe:
-- verstehen, wie schnell ein neuer Mitarbeiter modelliert und geprueft werden kann
-- pruefen, ob die Ausgabe fuer Reviews und Freigaben klar genug ist
-- Sicherheitsgrenzen frueh sichtbar machen (Mounts, Ports, Mutationen nur mit `--execute`)
+- verstehen, wie schnell ein Team vollstaendig in Betrieb genommen werden kann
+- pruefen, ob Lifecycle-Aktionen ohne Infrastrukturwissen ausfuehrbar sind
+- Sicherheitsgrenzen frueh sichtbar machen (Mounts, Ports, gezielte Reichweite)
 
 ## Launch-Konfigurationen fuer Erprobung
 
 Fuer die erste Erprobung nutzen wir in VS Code:
 
-- Clawake: render (developer)
-- Clawake: plan (developer)
+- Clawake: setup-quadlets
+- Clawake: status-quadlets
 
 Konfigurationsbasis:
-- `examples/staff/product.yml`
+- `examples/staff/team.yml`
 
 ## Beobachtungsprotokoll
 
-### Runde 1: Validate
+### Runde 1: Setup
 
-- Erwartung: Die Mitarbeiter-Datei ist formal valide und kann direkt weiterverarbeitet werden.
-- Beobachtung: `OK: examples/staff/product.yml is valid for cluster 'single-host-mvp'`.
-- Erkenntnis: Der Validate-Schritt liefert eine klare Freigabe fuer den naechsten Schritt.
-- Offene Frage: Wollen wir zusaetzlich Warnungen fuer `0.0.0.0` direkt im Validate-Output sehen?
+- Erwartung: Team-Mitglieder werden als Quadlets bereitgestellt, ohne dass ich systemd-Details kennen muss.
+- Beobachtung: Setup zeigt im Dry-Run die geplanten Aenderungen und setzt erst mit `--execute` um.
+- Erkenntnis: Das mentale Modell ist klar: Team-Definition rein, laufende Services raus.
+- Offene Frage: Sollen Setup-Ausgaben standardmaessig pro Rolle gruppiert werden?
 
-### Runde 2: Render
+### Runde 2: Restart
 
-- Erwartung: Fuer jeden Mitarbeiter wird eine Quadlet-Datei in `.rendered` erzeugt.
-- Beobachtung: `Rendered 2 file(s) into .rendered`.
-- Erkenntnis: Die Zuordnung Mitarbeiter -> Render-Artefakt ist fuer Reviews gut nachvollziehbar.
-- Offene Frage: Sollen Render-Ausgaben optional nach Rolle gruppiert werden (z. B. Unterordner)?
+- Erwartung: Nach Konfigurations- oder Imagewechseln werden nur relevante Mitglieder neu gestartet.
+- Beobachtung: Restart folgt demselben Safety-Muster (Preview vor Mutation).
+- Erkenntnis: Gezielte Neustarts reduzieren Risiko und beschleunigen den Betrieb.
+- Offene Frage: Brauchen wir einen interaktiven Bestatigungsschritt bei Team-weiten Restarts?
 
-### Runde 3: Plan
+### Runde 3: Status
 
-- Erwartung: Plan zeigt Drift oder bestaetigt, dass keine Aenderung auszurollen ist.
-- Beobachtung: `No changes for openclaw-product-owner` und `No changes for openclaw-developer`.
-- Erkenntnis: Der Dry-Run-Flow ist stabil und zeigt transparent, dass kein Apply notwendig ist.
-- Offene Frage: Brauchen wir einen maschinenlesbaren Plan-Modus (`--format json`) fuer Dashboard-Auswertungen?
+- Erwartung: Status zeigt Team-Zustand in einer kompakten, stakeholder-tauglichen Sicht.
+- Beobachtung: Jede Rolle ist mit Laufzustand und Basis-Checks sichtbar.
+- Erkenntnis: Der Health-Ueberblick funktioniert als zentrale Betriebsansicht.
+- Offene Frage: Welche Statusdetails brauchen wir zwingend im JSON-Modus?
+
+### Runde 4: Teardown
+
+- Erwartung: Einzelne Mitarbeiter oder ganze Teams lassen sich kontrolliert entfernen.
+- Beobachtung: Teardown bleibt im Dry-Run risikofrei und wird erst mit `--execute` wirksam.
+- Erkenntnis: Das Entfernen ist ein normaler Lifecycle-Schritt und kein Sonderfall.
+- Offene Frage: Sollen wir Team-weiten Teardown immer mit zweiter Bestatigung absichern?
 
 ## Sicherheits-Check je Runde
 
 - Risiko: ungewollte Host-Mutation
 - Impact: Instanz-Ausfall oder Konfigurationsdrift
-- Mitigation: standardmaessig Dry-Run, `--execute` explizit erforderlich
+- Mitigation: Dry-Run als Default, explizites `--execute`, zusaetzlich gezielte Zielauswahl (`--member`)
 
 - Risiko: zu breite Netzwerkfreigabe (z. B. `0.0.0.0`)
 - Impact: unerwuenschte Erreichbarkeit von Mitarbeiter-Instanzen
@@ -79,4 +91,8 @@ Konfigurationsbasis:
 
 ## Naechster Schritt
 
-Im naechsten Schritt erfassen wir hier echte Lauf-Erfahrungen aus den Launch-Profilen und leiten konkrete Verbesserungen fuer CLI-Ausgaben und Guardrails ab.
+Im naechsten Schritt erfassen wir echte Lauf-Erfahrungen fuer alle vier Lifecycle-Kommandos und leiten daraus konkrete CLI-Verbesserungen fuer Ausgabequalitaet, Selektorlogik und Guardrails ab.
+
+
+## Nutzung der Mitarbeiter
+

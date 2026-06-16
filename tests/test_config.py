@@ -6,16 +6,14 @@ from clawake.config import load_inventory
 
 
 def test_load_example_inventory() -> None:
-  inventory = load_inventory(Path("examples/staff/product.yml"))
-  assert inventory.cluster.mode == "single_host"
-  assert len(inventory.instances) == 2
-  assert {instance.role for instance in inventory.instances} == {"product_owner", "developer"}
-  assert all(instance.auto_onboard is not None for instance in inventory.instances)
-  for instance in inventory.instances:
-    assert "/.clawake/" not in instance.config_path
-    assert "/.clawake/" not in instance.state_path
-    assert f"/clawake/instances/{instance.name}/" in instance.config_path
-    assert f"/clawake/instances/{instance.name}/" in instance.state_path
+    inventory = load_inventory(Path("examples/staff/team.yml"))
+    assert inventory.cluster.mode == "single_host"
+    assert len(inventory.instances) == 2
+    assert {instance.role for instance in inventory.instances} == {"product_owner", "developer"}
+    assert all(instance.auto_onboard is not None for instance in inventory.instances)
+    for instance in inventory.instances:
+        assert instance.workspace_path.endswith("/workspace")
+        assert instance.team_definition_path.endswith("/role")
 
 
 def test_port_collision_validation(tmp_path: Path) -> None:
@@ -33,10 +31,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /srv/a/one/workspace
-    config_path: /srv/a/one/config
-    state_path: /srv/a/one/state
+    team_definition_path: /srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -46,10 +42,8 @@ instances:
   - name: two
     host: a
     role: product_owner
-    profile: public
     workspace_path: /srv/a/two/workspace
-    config_path: /srv/a/two/config
-    state_path: /srv/a/two/state
+    team_definition_path: /srv/a/two/role
     quadlet_path: two.container
     container_name: two
     image: {repository: ghcr.io/x, tag: "1"}
@@ -79,10 +73,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /srv/a/one/workspace
-    config_path: /srv/a/one/config
-    state_path: /srv/a/one/state
+    team_definition_path: /srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -92,10 +84,8 @@ instances:
   - name: two
     host: a
     role: product_owner
-    profile: public
     workspace_path: /srv/a/two/workspace
-    config_path: /srv/a/two/config
-    state_path: /srv/a/two/state
+    team_definition_path: /srv/a/two/role
     quadlet_path: two.container
     container_name: two
     image: {repository: ghcr.io/x, tag: "1"}
@@ -125,10 +115,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /srv/shared/workspace
-    config_path: /srv/a/one/config
-    state_path: /srv/a/one/state
+    team_definition_path: /srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -136,10 +124,8 @@ instances:
   - name: two
     host: a
     role: product_owner
-    profile: public
     workspace_path: /srv/a/two/workspace
-    config_path: /srv/shared/workspace
-    state_path: /srv/a/two/state
+    team_definition_path: /srv/shared/workspace
     quadlet_path: two.container
     container_name: two
     image: {repository: ghcr.io/x, tag: "1"}
@@ -167,10 +153,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: srv/a/one/workspace
-    config_path: /srv/a/one/config
-    state_path: /srv/a/one/state
+    team_definition_path: /srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -198,10 +182,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /srv/a/one/workspace
-    config_path: /srv/a/one/config
-    state_path: /srv/a/one/state
+    team_definition_path: /srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -231,10 +213,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /srv/a/one/workspace
-    config_path: /srv/a/one/config
-    state_path: /srv/a/one/state
+    team_definition_path: /srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -267,8 +247,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/dev
+    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/roles/dev
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -281,14 +261,11 @@ instances:
     inventory = load_inventory(cfg)
     instance = inventory.instances[0]
     assert instance.workspace_path == "/tmp/project/examples/workspaces/dev"
-    assert instance.config_path.endswith("/clawake/instances/one/config")
-    assert instance.state_path.endswith("/clawake/instances/one/state")
-    assert "/.clawake/" not in instance.config_path
-    assert "/.clawake/" not in instance.state_path
+    assert instance.team_definition_path == "/tmp/project/examples/roles/dev"
 
 
-def test_explicit_config_and_state_paths_still_supported(tmp_path: Path) -> None:
-    cfg = tmp_path / "explicit-paths.yaml"
+def test_team_definition_path_must_be_absolute(tmp_path: Path) -> None:
+    cfg = tmp_path / "invalid-team-definition-path.yaml"
     cfg.write_text(
         """
 version: 1
@@ -302,10 +279,8 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /srv/a/one/workspace
-    config_path: /srv/custom/config
-    state_path: /srv/custom/state
+    team_definition_path: srv/a/one/role
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -314,7 +289,5 @@ instances:
         encoding="utf-8",
     )
 
-    inventory = load_inventory(cfg)
-    instance = inventory.instances[0]
-    assert instance.config_path == "/srv/custom/config"
-    assert instance.state_path == "/srv/custom/state"
+    with pytest.raises(ValueError, match="must be an absolute path"):
+        load_inventory(cfg)

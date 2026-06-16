@@ -55,7 +55,7 @@ def test_validate_command(monkeypatch: object) -> None:
     # Positive case: image check is a no-op (registry not required in unit tests)
     monkeypatch.setattr(cli, "check_image_availability", lambda _: None)
 
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/team.yml"))])
     assert result.exit_code == 0
     assert "is valid for cluster" in result.stdout
 
@@ -79,7 +79,6 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /tmp/one/workspace
     config_path: /tmp/one/config
     state_path: /tmp/one/state
@@ -121,7 +120,6 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /tmp/one/workspace
     config_path: /tmp/one/config
     state_path: /tmp/one/state
@@ -168,7 +166,7 @@ def test_validate_image_not_found(monkeypatch: object) -> None:
         ),
     )
 
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/team.yml"))])
 
     assert result.exit_code != 0
     # The image reference should appear so the operator knows which image failed
@@ -196,7 +194,7 @@ def test_validate_image_auth_error(monkeypatch: object) -> None:
         ),
     )
 
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/team.yml"))])
 
     assert result.exit_code != 0
     assert "unauthorized" in result.output.lower()
@@ -220,7 +218,7 @@ def test_validate_image_network_error(monkeypatch: object) -> None:
         ),
     )
 
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/team.yml"))])
 
     assert result.exit_code != 0
     assert "connection refused" in result.output.lower()
@@ -243,7 +241,7 @@ def test_validate_image_digest_mismatch(monkeypatch: object) -> None:
         ),
     )
 
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/team.yml"))])
 
     assert result.exit_code != 0
     assert "digest" in result.output.lower()
@@ -267,7 +265,7 @@ def test_validate_image_errors_reported_per_instance(monkeypatch: object) -> Non
 
     monkeypatch.setattr(cli, "check_image_availability", _count_and_raise)
 
-    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/product.yml"))])
+    result = runner.invoke(app, ["validate", "--config", str(Path("examples/staff/team.yml"))])
 
     # Both instances in product.yml must have been checked
     assert call_count == 2
@@ -280,7 +278,7 @@ def test_apply_dry_run(tmp_path: Path) -> None:
         [
             "apply",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--target",
             str(target),
             "--output",
@@ -308,7 +306,7 @@ def test_apply_execute(monkeypatch: object, tmp_path: Path) -> None:
         [
             "apply",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--target",
             str(target),
             "--output",
@@ -356,7 +354,7 @@ def test_apply_execute_no_changes_still_reloads(monkeypatch: object, tmp_path: P
         [
             "render",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--output",
             str(output),
         ],
@@ -372,7 +370,7 @@ def test_apply_execute_no_changes_still_reloads(monkeypatch: object, tmp_path: P
         [
             "apply",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--target",
             str(target),
             "--output",
@@ -442,7 +440,6 @@ def test_apply_execute_repairs_auto_onboard_config_without_quadlet_changes(
                 "name": "one",
                 "host": "h",
                 "role": "developer",
-                "profile": "internal",
                 "workspace_path": str(workspace),
                 "quadlet_path": "one.container",
                 "container_name": "one",
@@ -507,6 +504,128 @@ def test_apply_execute_repairs_auto_onboard_config_without_quadlet_changes(
     assert "Auto-onboard repaired runtime config for one" in result.output
 
 
+def test_apply_execute_repairs_auto_onboard_when_value_mismatch(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    from clawake import cli
+
+    class RecordingSystemdService:
+        daemon_reload_calls = 0
+        restart_calls = 0
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.daemon_reload_calls += 1
+            return CommandResult(
+                command=["systemctl", "--user", "daemon-reload"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.restart_calls += 1
+            return CommandResult(
+                command=["systemctl", "--user", "restart", f"{instance_name}.service"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+    monkeypatch.setattr(cli, "SystemdService", RecordingSystemdService)
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("CLAWAKE_RUNTIME_ROOT", str(runtime_root))
+
+    env_file = tmp_path / "instance.env"
+    env_file.write_text(
+        "OPENCLAW_GATEWAY_BIND=local\nOPENCLAW_GATEWAY_TOKEN=test-token\n",
+        encoding="utf-8",
+    )
+
+    config_file = tmp_path / "inventory.yml"
+    config_data = {
+        "version": 1,
+        "cluster": {
+            "name": "c",
+            "mode": "single_host",
+            "primary_host": "h",
+        },
+        "hosts": [{"name": "h"}],
+        "instances": [
+            {
+                "name": "one",
+                "host": "h",
+                "role": "developer",
+                "workspace_path": str(workspace),
+                "quadlet_path": "one.container",
+                "container_name": "one",
+                "image": {"repository": "ghcr.io/openclaw/openclaw", "tag": "2026.6.5"},
+                "env_files": [str(env_file)],
+                "auto_onboard": {
+                    "required_env": ["OPENCLAW_GATEWAY_BIND", "OPENCLAW_GATEWAY_TOKEN"],
+                    "openclaw_config": {
+                        "gateway": {
+                            "mode": "$ENV:OPENCLAW_GATEWAY_BIND",
+                            "auth": {"token": "$ENV:OPENCLAW_GATEWAY_TOKEN"},
+                        }
+                    },
+                },
+                "dashboard": {"friendly_name": "One"},
+            }
+        ],
+    }
+    config_file.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
+
+    output = tmp_path / "rendered"
+    target = tmp_path / "target"
+    render_result = runner.invoke(
+        app,
+        [
+            "render",
+            "--config",
+            str(config_file),
+            "--output",
+            str(output),
+        ],
+    )
+    assert render_result.exit_code == 0
+
+    target.mkdir(parents=True, exist_ok=True)
+    for rendered_file in output.glob("*.container"):
+        shutil.copy2(rendered_file, target / rendered_file.name)
+
+    runtime_state = runtime_root / "one" / "state"
+    runtime_state.mkdir(parents=True, exist_ok=True)
+    (runtime_state / "openclaw.json").write_text(
+        '{"gateway": {"mode": "remote", "auth": {"token": "test-token"}}}\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "apply",
+            "--config",
+            str(config_file),
+            "--target",
+            str(target),
+            "--output",
+            str(output),
+            "--execute",
+        ],
+    )
+
+    assert result.exit_code == 0
+    repaired = json.loads((runtime_state / "openclaw.json").read_text(encoding="utf-8"))
+    assert repaired["gateway"]["mode"] == "local"
+    assert RecordingSystemdService.daemon_reload_calls == 1
+    assert RecordingSystemdService.restart_calls == 1
+    assert "Auto-onboard repaired runtime config for one" in result.output
+
+
 def test_apply_execute_prepares_runtime_mount_paths(monkeypatch: object, tmp_path: Path) -> None:
         from clawake import cli
 
@@ -534,7 +653,6 @@ def test_apply_execute_prepares_runtime_mount_paths(monkeypatch: object, tmp_pat
                                 "name": "one",
                                 "host": "h",
                                 "role": "developer",
-                                "profile": "internal",
                                 "workspace_path": str(workspace),
                                 "config_path": str(config_path),
                                 "state_path": str(state_path),
@@ -596,7 +714,6 @@ def test_apply_execute_fails_when_workspace_missing(monkeypatch: object, tmp_pat
                                 "name": "one",
                                 "host": "h",
                                 "role": "developer",
-                                "profile": "internal",
                                 "workspace_path": str(missing_workspace),
                                 "config_path": str(config_path),
                                 "state_path": str(state_path),
@@ -671,7 +788,6 @@ def test_apply_execute_repairs_owner_mismatched_state_file(monkeypatch: object, 
                 "name": "one",
                 "host": "h",
                 "role": "developer",
-                "profile": "internal",
                 "workspace_path": str(workspace),
                 "config_path": str(config_path),
                 "state_path": str(state_path),
@@ -747,7 +863,7 @@ def test_status_cluster_json(monkeypatch: object) -> None:
         [
             "status-cluster",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--format",
             "json",
         ],
@@ -799,7 +915,7 @@ def test_status_cluster_execute_prints_cause(monkeypatch: object) -> None:
         [
             "status-cluster",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--format",
             "text",
             "--execute",
@@ -807,8 +923,8 @@ def test_status_cluster_execute_prints_cause(monkeypatch: object) -> None:
     )
 
     assert result.exit_code != 0
-    assert "excalibot-product-owner [product_owner/public] state=healthy rc=0" in result.output
-    assert "excalibot-developer [developer/internal] state=failed rc=3" in result.output
+    assert "excalibot-product-owner [product_owner] state=healthy rc=0" in result.output
+    assert "excalibot-developer [developer] state=failed rc=3" in result.output
     assert "cause: Error: missing API key" in result.output
 
 
@@ -818,7 +934,7 @@ def test_auto_onboard_dry_run() -> None:
                 [
                         "auto-onboard",
                         "--config",
-                        str(Path("examples/staff/product.yml")),
+                        str(Path("examples/staff/team.yml")),
                         "--instance",
                         "excalibot-product-owner",
                 ],
@@ -827,7 +943,7 @@ def test_auto_onboard_dry_run() -> None:
         assert result.exit_code == 0
         assert "Auto-onboard plan for excalibot-product-owner" in result.output
         assert "DRY RUN auto-onboard complete" in result.output
-        assert "Use openclaw --profile public" in result.output
+        assert "Use openclaw commands directly inside this instance" in result.output
         assert "models auth login --provider openai --device-code" in result.output
 
 
@@ -860,7 +976,6 @@ def test_auto_onboard_execute_writes_openclaw_json(tmp_path: Path) -> None:
                                 "name": "one",
                                 "host": "a",
                                 "role": "developer",
-                                "profile": "internal",
                                 "workspace_path": "/tmp/one/workspace",
                                 "config_path": "/tmp/one/config",
                                 "state_path": str(state_root),
@@ -926,7 +1041,6 @@ def test_auto_onboard_fails_when_required_env_missing(tmp_path: Path) -> None:
                                 "name": "one",
                                 "host": "a",
                                 "role": "developer",
-                                "profile": "internal",
                                 "workspace_path": "/tmp/one/workspace",
                                 "config_path": "/tmp/one/config",
                                 "state_path": "/tmp/one/state",
@@ -971,7 +1085,7 @@ def test_teardown_dry_run_cluster() -> None:
         [
             "teardown",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
         ],
     )
 
@@ -988,7 +1102,7 @@ def test_remove_alias_calls_teardown() -> None:
         [
             "remove",
             "--config",
-            str(Path("examples/staff/product.yml")),
+            str(Path("examples/staff/team.yml")),
             "--instance",
             "excalibot-product-owner",
         ],
@@ -1017,7 +1131,6 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /tmp/one/workspace
     config_path: /tmp/one/config
     state_path: /tmp/one/state
@@ -1028,7 +1141,6 @@ instances:
   - name: two
     host: a
     role: product_owner
-    profile: public
     workspace_path: /tmp/two/workspace
     config_path: /tmp/two/config
     state_path: /tmp/two/state
@@ -1099,7 +1211,6 @@ instances:
   - name: one
     host: a
     role: developer
-    profile: internal
     workspace_path: /tmp/one/workspace
     config_path: /tmp/one/config
     state_path: /tmp/one/state
@@ -1110,7 +1221,6 @@ instances:
   - name: two
     host: a
     role: product_owner
-    profile: public
     workspace_path: /tmp/two/workspace
     config_path: /tmp/two/config
     state_path: /tmp/two/state
@@ -1161,3 +1271,185 @@ instances:
 
     assert result.exit_code == 0
     assert RecordImageRemovalSystemdService.image_removals == 1
+
+
+def test_setup_quadlets_dry_run() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "setup-quadlets",
+            "--config",
+            str(Path("examples/staff/team.yml")),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Setup plan for cluster" in result.output
+    assert "DRY RUN setup-quadlets complete" in result.output
+
+
+def test_restart_quadlets_member_execute(monkeypatch: object) -> None:
+    from clawake import cli
+
+    class RecordRestartSystemdService:
+        restarted: list[str] = []
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            RecordRestartSystemdService.restarted.append(instance_name)
+            return CommandResult(
+                command=["systemctl", "--user", "restart", f"{instance_name}.service"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+    monkeypatch.setattr(cli, "SystemdService", RecordRestartSystemdService)
+
+    result = runner.invoke(
+        app,
+        [
+            "restart-quadlets",
+            "--config",
+            str(Path("examples/staff/team.yml")),
+            "--member",
+            "excalibot-product-owner",
+            "--execute",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert RecordRestartSystemdService.restarted == ["excalibot-product-owner"]
+
+
+def test_status_quadlets_json(monkeypatch: object) -> None:
+    from clawake import cli
+
+    monkeypatch.setattr(cli, "SystemdService", FakeSystemdService)
+    result = runner.invoke(
+        app,
+        [
+            "status-quadlets",
+            "--config",
+            str(Path("examples/staff/team.yml")),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["cluster"] == "single-host-mvp"
+    assert len(payload["instances"]) == 2
+
+
+def test_teardown_quadlets_member_alias() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "teardown-quadlets",
+            "--config",
+            str(Path("examples/staff/team.yml")),
+            "--member",
+            "excalibot-product-owner",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Teardown plan for cluster" in result.output
+    assert "excalibot-product-owner" in result.output
+
+
+def test_setup_quadlets_execute_writes_openclaw_config(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    from clawake import cli
+
+    class RecordingSystemdService:
+        daemon_reload_calls = 0
+        restart_calls = 0
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.daemon_reload_calls += 1
+            return CommandResult(
+                command=["systemctl", "--user", "daemon-reload"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.restart_calls += 1
+            return CommandResult(
+                command=["systemctl", "--user", "restart", f"{instance_name}.service"],
+                return_code=0,
+                stdout="ok",
+                stderr="",
+            )
+
+    monkeypatch.setattr(cli, "SystemdService", RecordingSystemdService)
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    quadlet_root = tmp_path / "quadlets"
+    env_file = tmp_path / "instance.env"
+    env_file.write_text(
+        "OPENCLAW_GATEWAY_BIND=local\nOPENCLAW_GATEWAY_TOKEN=test-token\n",
+        encoding="utf-8",
+    )
+
+    config_file = tmp_path / "inventory.yml"
+    config_data = {
+        "version": 1,
+        "cluster": {
+            "name": "c",
+            "mode": "single_host",
+            "primary_host": "h",
+        },
+        "hosts": [{"name": "h", "quadlet_root": str(quadlet_root)}],
+        "instances": [
+            {
+                "name": "one",
+                "host": "h",
+                "role": "developer",
+                "workspace_path": str(workspace),
+                "state_path": str(tmp_path / "runtime" / "state"),
+                "quadlet_path": "one.container",
+                "container_name": "one",
+                "image": {"repository": "ghcr.io/openclaw/openclaw", "tag": "2026.6.5"},
+                "env_files": [str(env_file)],
+                "auto_onboard": {
+                    "required_env": ["OPENCLAW_GATEWAY_BIND", "OPENCLAW_GATEWAY_TOKEN"],
+                    "openclaw_config": {
+                        "gateway": {
+                            "mode": "$ENV:OPENCLAW_GATEWAY_BIND",
+                            "auth": {"token": "$ENV:OPENCLAW_GATEWAY_TOKEN"},
+                        }
+                    },
+                },
+                "dashboard": {"friendly_name": "One"},
+            }
+        ],
+    }
+    config_file.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
+
+    output = tmp_path / "rendered"
+    result = runner.invoke(
+        app,
+        [
+            "setup-quadlets",
+            "--config",
+            str(config_file),
+            "--output",
+            str(output),
+            "--execute",
+        ],
+    )
+
+    assert result.exit_code == 0
+    state_file = tmp_path / "runtime" / "state" / "openclaw.json"
+    payload = json.loads(state_file.read_text(encoding="utf-8"))
+    assert payload["gateway"]["mode"] == "local"
+    assert payload["gateway"]["auth"]["token"] == "test-token"
+    assert RecordingSystemdService.daemon_reload_calls == 1
+    assert RecordingSystemdService.restart_calls == 1

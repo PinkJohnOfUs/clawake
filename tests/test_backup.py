@@ -5,15 +5,13 @@ from clawake.config import BackupPolicy, DashboardMeta, ImageSpec, InstanceSpec
 from clawake.services.backup import backup_instance
 
 
-def _instance_with_paths(workspace: Path, config_path: Path, state_path: Path) -> InstanceSpec:
+def _instance_with_paths(workspace: Path, team_definition_path: Path) -> InstanceSpec:
     return InstanceSpec(
         name="one",
         host="h",
         role="developer",
-        profile="internal",
         workspace_path=str(workspace),
-        config_path=str(config_path),
-        state_path=str(state_path),
+        team_definition_path=str(team_definition_path),
         quadlet_path="one.container",
         container_name="one",
         image=ImageSpec(repository="ghcr.io/openclaw/openclaw", tag="2026.6.5"),
@@ -24,22 +22,20 @@ def _instance_with_paths(workspace: Path, config_path: Path, state_path: Path) -
 
 def test_backup_instance_skips_unreadable_files(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
-    config_dir = tmp_path / "config"
-    state_dir = tmp_path / "state"
+    team_definition = tmp_path / "role"
     output_dir = tmp_path / "backups"
 
     workspace.mkdir(parents=True, exist_ok=True)
-    config_dir.mkdir(parents=True, exist_ok=True)
-    state_dir.mkdir(parents=True, exist_ok=True)
+    team_definition.mkdir(parents=True, exist_ok=True)
 
-    readable = state_dir / "readable.txt"
+    readable = team_definition / "readable.txt"
     readable.write_text("ok\n", encoding="utf-8")
 
-    unreadable = state_dir / "openclaw.json"
+    unreadable = team_definition / "openclaw.json"
     unreadable.write_text("{}\n", encoding="utf-8")
     unreadable.chmod(0)
 
-    instance = _instance_with_paths(workspace, config_dir, state_dir)
+    instance = _instance_with_paths(workspace, team_definition)
 
     try:
         archive = backup_instance(instance, output_dir=output_dir, execute=True)
@@ -57,15 +53,13 @@ def test_backup_instance_skips_unreadable_files(tmp_path: Path) -> None:
 
 def test_backup_instance_dry_run_does_not_create_archive(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
-    config_dir = tmp_path / "config"
-    state_dir = tmp_path / "state"
+    team_definition = tmp_path / "role"
     output_dir = tmp_path / "backups"
 
     workspace.mkdir(parents=True, exist_ok=True)
-    config_dir.mkdir(parents=True, exist_ok=True)
-    state_dir.mkdir(parents=True, exist_ok=True)
+    team_definition.mkdir(parents=True, exist_ok=True)
 
-    instance = _instance_with_paths(workspace, config_dir, state_dir)
+    instance = _instance_with_paths(workspace, team_definition)
     archive = backup_instance(instance, output_dir=output_dir, execute=False)
 
     assert not archive.exists()
@@ -74,20 +68,18 @@ def test_backup_instance_dry_run_does_not_create_archive(tmp_path: Path) -> None
 
 def test_backup_instance_skips_legacy_workspace_runtime_tree(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
-    config_dir = tmp_path / "config"
-    state_dir = tmp_path / "state"
+    team_definition = tmp_path / "role"
     output_dir = tmp_path / "backups"
 
     workspace.mkdir(parents=True, exist_ok=True)
-    config_dir.mkdir(parents=True, exist_ok=True)
-    state_dir.mkdir(parents=True, exist_ok=True)
+    team_definition.mkdir(parents=True, exist_ok=True)
 
     legacy_runtime = workspace / ".clawake" / "state"
     legacy_runtime.mkdir(parents=True, exist_ok=True)
     (legacy_runtime / "openclaw.json").write_text('{"legacy":true}\n', encoding="utf-8")
     (workspace / "README.txt").write_text("workspace data\n", encoding="utf-8")
 
-    instance = _instance_with_paths(workspace, config_dir, state_dir)
+    instance = _instance_with_paths(workspace, team_definition)
     archive = backup_instance(instance, output_dir=output_dir, execute=True)
 
     with tarfile.open(archive, "r:gz") as tar:

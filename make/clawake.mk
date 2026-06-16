@@ -1,8 +1,6 @@
 UV ?= uv
-CONFIG ?= examples/staff/product.yml
-OUTPUT ?= .rendered
-TARGET ?= $(HOME)/.config/containers/systemd
-INSTANCE ?= excalibot-product-owner
+CONFIG ?= examples/staff/team.yml
+MEMBER ?=
 CLAWAKE_WORKSPACE_ROOT ?= $(CURDIR)
 CLAWAKE_RUNTIME_ROOT ?= $(CURDIR)/.clawake/instances
 
@@ -12,8 +10,9 @@ export CLAWAKE_RUNTIME_ROOT
 CLAWAKE_RUN = $(UV) run clawake
 
 .PHONY: uv-sync install-dev install-tool uninstall-tool doctor \
-	validate render plan deploy deploy-exec apply apply-exec auto-onboard auto-onboard-exec \
-	status-cluster teardown-example teardown-example-exec test lint fmt
+	setup-quadlets setup-quadlets-exec restart-quadlets restart-quadlets-exec \
+	teardown-quadlets teardown-quadlets-exec status-quadlets status-quadlets-json \
+	test-lifecycle test lint fmt
 
 uv-sync: ## Install project dependencies into .venv via uv
 	$(UV) sync
@@ -29,41 +28,35 @@ uninstall-tool: ## Remove user-level clawake CLI installed by uv tool
 doctor: ## Show clawake --help through uv run
 	$(CLAWAKE_RUN) --help
 
-validate: ## Run clawake validate with CONFIG
-	$(CLAWAKE_RUN) validate -c $(CONFIG)
+setup-quadlets: ## Dry-run setup-quadlets (use MEMBER=<name> to scope)
+	$(CLAWAKE_RUN) setup-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),)
 
-render: ## Run clawake render with CONFIG/OUTPUT
-	$(CLAWAKE_RUN) render -c $(CONFIG) -o $(OUTPUT)
+setup-quadlets-exec: ## Execute setup-quadlets (use MEMBER=<name> to scope)
+	$(CLAWAKE_RUN) setup-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),) --execute
 
-plan: ## Run clawake plan with CONFIG/OUTPUT
-	$(CLAWAKE_RUN) plan -c $(CONFIG) -o $(OUTPUT)
+restart-quadlets: ## Dry-run restart-quadlets (use MEMBER=<name> to scope)
+	$(CLAWAKE_RUN) restart-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),)
 
-deploy: ## Dry-run deploy to TARGET
-	$(CLAWAKE_RUN) deploy -c $(CONFIG) --target $(TARGET)
+restart-quadlets-exec: ## Execute restart-quadlets (use MEMBER=<name> to scope)
+	$(CLAWAKE_RUN) restart-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),) --execute
 
-deploy-exec: ## Execute deploy to TARGET
-	$(CLAWAKE_RUN) deploy -c $(CONFIG) --target $(TARGET) --execute
+teardown-quadlets: ## Dry-run teardown-quadlets (use MEMBER=<name> to scope)
+	$(CLAWAKE_RUN) teardown-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),)
 
-apply: ## Dry-run apply to TARGET
-	$(CLAWAKE_RUN) apply -c $(CONFIG) --target $(TARGET) -o $(OUTPUT)
+teardown-quadlets-exec: ## Execute teardown-quadlets (use MEMBER=<name> to scope)
+	$(CLAWAKE_RUN) teardown-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),) --execute
 
-apply-exec: ## Execute apply to TARGET
-	$(CLAWAKE_RUN) apply -c $(CONFIG) --target $(TARGET) -o $(OUTPUT) --execute
+status-quadlets: ## Check status-quadlets in text format
+	$(CLAWAKE_RUN) status-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),) --format text
 
-auto-onboard: ## Dry-run auto-onboard plan for INSTANCE
-	$(CLAWAKE_RUN) auto-onboard -c $(CONFIG) -i $(INSTANCE)
+status-quadlets-json: ## Check status-quadlets in json format
+	$(CLAWAKE_RUN) status-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),) --format json
 
-auto-onboard-exec: ## Execute auto-onboard for INSTANCE
-	$(CLAWAKE_RUN) auto-onboard -c $(CONFIG) -i $(INSTANCE) --execute
-
-status-cluster: ## Check status-cluster in text format
-	$(CLAWAKE_RUN) status-cluster -c $(CONFIG) --format text --execute
-
-teardown-example: ## Dry-run teardown for examples/staff/product.yml
-	$(CLAWAKE_RUN) teardown -c examples/staff/product.yml
-
-teardown-example-exec: ## Execute teardown for examples/staff/product.yml (all instances)
-	$(CLAWAKE_RUN) teardown -c examples/staff/product.yml --execute
+test-lifecycle: ## Run architecture lifecycle flow (setup/restart/status/teardown); status is best-effort
+	$(MAKE) setup-quadlets CONFIG=$(CONFIG) MEMBER=$(MEMBER)
+	$(MAKE) restart-quadlets CONFIG=$(CONFIG) MEMBER=$(MEMBER)
+	-$(MAKE) status-quadlets CONFIG=$(CONFIG) MEMBER=$(MEMBER)
+	$(MAKE) teardown-quadlets CONFIG=$(CONFIG) MEMBER=$(MEMBER)
 
 test: ## Run pytest
 	$(UV) run pytest

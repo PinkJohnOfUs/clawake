@@ -9,7 +9,7 @@
       "args": [
         "validate",
         "--config",
-        "examples/staff/product.yml"
+        "examples/staff/team.yml"
       ],
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -29,7 +29,7 @@
       "args": [
         "render",
         "--config",
-        "examples/staff/product.yml",
+        "examples/staff/team.yml",
         "--output",
         ".rendered"
       ],
@@ -51,7 +51,7 @@
       "args": [
         "plan",
         "--config",
-        "examples/staff/product.yml",
+        "examples/staff/team.yml",
         "--output",
         ".rendered"
       ],
@@ -73,7 +73,7 @@
       "args": [
         "status-cluster",
         "--config",
-        "examples/staff/product.yml",
+        "examples/staff/team.yml",
         "--format",
         "json"
       ],
@@ -95,7 +95,7 @@
       "args": [
         "apply",
         "--config",
-        "examples/staff/product.yml",
+        "examples/staff/team.yml",
         "--target",
         "${env:HOME}/.config/containers/systemd"
       ],

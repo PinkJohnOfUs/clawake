@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
 import shutil
@@ -7,11 +8,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
 from clawake.config import InstanceSpec
 
 _ENV_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _REQUIRED_PREFIX = "$ENV:"
 _OPTIONAL_PREFIX = "$ENV?:"
+_UNSET = object()
+
+
+def _is_sensitive_env_key(key: str) -> bool:
+    upper_key = key.upper()
+    sensitive_tokens = ("TOKEN", "API_KEY", "SECRET", "PASSWORD", "PASSWD")
+    return any(token in upper_key for token in sensitive_tokens)
+
+
+def _is_env_reference(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    return value.startswith(_REQUIRED_PREFIX) or value.startswith(_OPTIONAL_PREFIX)
 
 
 @dataclass
@@ -67,25 +83,94 @@ def _resolve_template_value(
     if isinstance(value, str):
         if value.startswith(_OPTIONAL_PREFIX):
             key = value[len(_OPTIONAL_PREFIX) :]
-            return env.get(key)
+            if key not in env:
+                return value
+            if _is_sensitive_env_key(key):
+                return value
+            return env[key]
         if value.startswith(_REQUIRED_PREFIX):
             key = value[len(_REQUIRED_PREFIX) :]
             if key not in env:
                 missing_required_env.add(key)
                 return None
+            if _is_sensitive_env_key(key):
+                return value
             return env[key]
         return value
 
     if isinstance(value, list):
-        return [_resolve_template_value(item, env, missing_required_env) for item in value]
+        return [
+            resolved
+            for item in value
+            if (resolved := _resolve_template_value(item, env, missing_required_env)) is not _UNSET
+        ]
 
     if isinstance(value, dict):
         return {
-            key: _resolve_template_value(item, env, missing_required_env)
+            key: resolved
             for key, item in value.items()
+            if (resolved := _resolve_template_value(item, env, missing_required_env)) is not _UNSET
         }
 
     return value
+
+
+def _load_existing_config(path: Path) -> dict[str, Any]:
+    if not path.exists() or not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if isinstance(payload, dict):
+        return payload
+    return {}
+
+
+def _deep_merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = copy.deepcopy(base)
+    for key, value in overlay.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_config(existing, value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _normalize_openclaw_config(config: dict[str, Any]) -> dict[str, Any]:
+    channels = config.get("channels")
+    if not isinstance(channels, dict):
+        return config
+
+    discord = channels.get("discord")
+    if not isinstance(discord, dict):
+        return config
+
+    server_id = discord.pop("server_id", _UNSET)
+    channel_id = discord.pop("channel_id", _UNSET)
+
+    if server_id is _UNSET and channel_id is _UNSET:
+        return config
+
+    if (
+        isinstance(server_id, str)
+        and isinstance(channel_id, str)
+        and not _is_env_reference(server_id)
+        and not _is_env_reference(channel_id)
+    ):
+        guilds = discord.setdefault("guilds", {})
+        if isinstance(guilds, dict):
+            guild = guilds.setdefault(server_id, {})
+            if isinstance(guild, dict):
+                guild_channels = guild.setdefault("channels", {})
+                if isinstance(guild_channels, dict):
+                    guild_channels.setdefault(
+                        channel_id,
+                        {"enabled": True, "requireMention": False},
+                    )
+
+    return config
 
 
 def build_auto_onboard_plan(instance: InstanceSpec) -> AutoOnboardPlan:
@@ -106,23 +191,25 @@ def build_auto_onboard_plan(instance: InstanceSpec) -> AutoOnboardPlan:
         env,
         missing_required_env,
     )
+    rendered_config = _normalize_openclaw_config(rendered_config)
 
     for key in instance.auto_onboard.required_env:
         if key not in env:
             missing_required_env.add(key)
 
     guardrails = [
-        f"Use openclaw --profile {instance.profile} for CLI commands inside this instance"
+        "Use openclaw commands directly inside this instance"
     ]
     provider = env.get("OPENCLAW_MODEL_PROVIDER", "openai").strip().lower()
     if provider == "openai" and not env.get("OPENAI_API_KEY"):
         guardrails.append(
             "Model auth for OpenAI is not configured via env. "
-            f"Run: openclaw --profile {instance.profile} models auth login --provider openai --device-code"
+            "Run: openclaw models auth login --provider openai --device-code"
         )
 
-    target = Path(instance.state_path).expanduser() / "openclaw.json"
-    backup = Path(instance.state_path).expanduser() / "openclaw.json.last-good"
+    runtime_dir = Path(instance.workspace_path).expanduser() / ".openclaw"
+    target = runtime_dir / "openclaw.json"
+    backup = runtime_dir / "openclaw.json.last-good"
     return AutoOnboardPlan(
         instance=instance.name,
         target_path=target,
@@ -133,15 +220,39 @@ def build_auto_onboard_plan(instance: InstanceSpec) -> AutoOnboardPlan:
     )
 
 
+def _template_root() -> Path:
+    return Path(__file__).resolve().parents[3] / "templates"
+
+
+def _render_openclaw_json(config: dict[str, Any]) -> str:
+    env = Environment(
+        loader=FileSystemLoader(str(_template_root())),
+        undefined=StrictUndefined,
+        autoescape=False,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = env.get_template("openclaw/openclaw.json.j2")
+    rendered_json = json.dumps(config, indent=2)
+    return template.render(rendered_json=rendered_json).strip() + "\n"
+
+
 def write_auto_onboard_config(plan: AutoOnboardPlan, execute: bool = False) -> None:
     if not execute:
         return
 
     plan.target_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_config = _load_existing_config(plan.target_path)
+    final_config = _deep_merge_config(existing_config, plan.config)
+    final_config = _normalize_openclaw_config(final_config)
     if plan.target_path.exists():
         shutil.copy2(plan.target_path, plan.backup_path)
 
-    plan.target_path.write_text(
-        json.dumps(plan.config, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    plan.target_path.write_text(_render_openclaw_json(final_config), encoding="utf-8")
+
+
+def auto_onboard_would_change(plan: AutoOnboardPlan) -> bool:
+    existing_config = _load_existing_config(plan.target_path)
+    final_config = _deep_merge_config(existing_config, plan.config)
+    final_config = _normalize_openclaw_config(final_config)
+    return final_config != existing_config

@@ -1,20 +1,1832 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "uv: sync",
-      "type": "shell",
-      "command": "uv",
-      "args": [
-        "sync"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}"
-        }
-      },
-      "problemMatcher": []
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "uv: sync",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"sync"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}"
+				}
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "pytest:auto-onboard",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:auto-onboard:rerun",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:auto-onboard:rerun2",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:auto-onboard:rerun3",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:test-config",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_config.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:test-config:rerun",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_config.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:test-config:rerun2",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_config.py",
+				"-q"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:auto-onboard+config",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard",
+				"tests/test_config.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:test-config:final",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_config.py",
+				"-q"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "test:auto-onboard:dryrun-both",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-product-owner"
+			]
+		},
+		{
+			"label": "test:auto-onboard:dryrun-dev",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-developer"
+			]
+		},
+		{
+			"label": "test:auto-onboard:exec-po",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-product-owner",
+				"--execute"
+			]
+		},
+		{
+			"label": "test:auto-onboard:exec-dev",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-developer",
+				"--execute"
+			]
+		},
+		{
+			"label": "test:auto-onboard:status",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"examples/workspaces/product-owner/.clawake/config/openclaw.json",
+				"examples/workspaces/product-owner/.clawake/config/openclaw.json.last-good",
+				"examples/workspaces/developer/.clawake/config/openclaw.json",
+				"examples/workspaces/developer/.clawake/config/openclaw.json.last-good"
+			]
+		},
+		{
+			"label": "check:podman-ps",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"ps",
+				"--format",
+				"{{.Names}}"
+			]
+		},
+		{
+			"label": "check:profile-public-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"--help"
+			]
+		},
+		{
+			"label": "check:status-no-profile",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"status"
+			]
+		},
+		{
+			"label": "check:status-public-profile",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"status"
+			]
+		},
+		{
+			"label": "fix:auto-onboard:exec-po",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-product-owner",
+				"--execute"
+			]
+		},
+		{
+			"label": "verify:status-public-profile",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"status"
+			]
+		},
+		{
+			"label": "inspect:config-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"config",
+				"--help"
+			]
+		},
+		{
+			"label": "inspect:config-validate",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"config",
+				"validate"
+			]
+		},
+		{
+			"label": "inspect:doctor",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"doctor"
+			]
+		},
+		{
+			"label": "inspect:schema-top-keys",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"podman exec excalibot-product-owner openclaw --profile public config schema | jq -r '.properties | keys[]'"
+			]
+		},
+		{
+			"label": "inspect:config-schema",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"config",
+				"schema"
+			]
+		},
+		{
+			"label": "retest:auto-onboard-po",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-product-owner",
+				"--execute"
+			]
+		},
+		{
+			"label": "retest:auto-onboard-dev",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-developer",
+				"--execute"
+			]
+		},
+		{
+			"label": "retest:status-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"status"
+			]
+		},
+		{
+			"label": "retest:status-internal",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-developer",
+				"openclaw",
+				"--profile",
+				"internal",
+				"status"
+			]
+		},
+		{
+			"label": "fixhint:gateway-probe-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"gateway",
+				"probe"
+			]
+		},
+		{
+			"label": "fixhint:doctor-fix-dry-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"doctor",
+				"--fix"
+			]
+		},
+		{
+			"label": "verify:status-public-after-fix",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"status"
+			]
+		},
+		{
+			"label": "inspect:devices-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"devices",
+				"--help"
+			]
+		},
+		{
+			"label": "inspect:devices-list",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"devices",
+				"list"
+			]
+		},
+		{
+			"label": "inspect:gateway-status-deep",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"gateway",
+				"status",
+				"--deep",
+				"--require-rpc"
+			]
+		},
+		{
+			"label": "inspect:container-openclaw-json",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"cat",
+				"/home/node/.openclaw-public/openclaw.json"
+			]
+		},
+		{
+			"label": "reapply:onboard-po-token",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-product-owner",
+				"--execute"
+			]
+		},
+		{
+			"label": "reapply:onboard-dev-token",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"auto-onboard",
+				"-c",
+				"examples/staff/team.yml",
+				"-i",
+				"excalibot-developer",
+				"--execute"
+			]
+		},
+		{
+			"label": "debug:onboard-plan-po",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"python",
+				"-c",
+				"from pathlib import Path; from clawake.config import load_inventory; from clawake.services.onboarding import build_auto_onboard_plan; inv=load_inventory(Path('examples/staff/team.yml')); inst=[i for i in inv.instances if i.name=='excalibot-product-owner'][0]; plan=build_auto_onboard_plan(inst); import json; print(json.dumps(plan.config, indent=2, sort_keys=True))"
+			]
+		},
+		{
+			"label": "debug:onboard-plan-po2",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"python",
+				"-c",
+				"from pathlib import Path; import json; from clawake.config import load_inventory; from clawake.services.onboarding import build_auto_onboard_plan; inv=load_inventory(Path(\"examples/staff/team.yml\")); inst=[i for i in inv.instances if i.name==\"excalibot-product-owner\"][0]; plan=build_auto_onboard_plan(inst); print(json.dumps(plan.config, indent=2, sort_keys=True))"
+			]
+		},
+		{
+			"label": "debug:write-then-cat-po",
+			"type": "shell",
+			"command": "zsh",
+			"args": [
+				"-lc",
+				"uv run clawake auto-onboard -c examples/staff/team.yml -i excalibot-product-owner --execute && echo '---' && cat examples/workspaces/product-owner/.clawake/config/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:status-public-token-present",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"status"
+			]
+		},
+		{
+			"label": "verify:status-internal-token",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-developer",
+				"openclaw",
+				"--profile",
+				"internal",
+				"status"
+			]
+		},
+		{
+			"label": "test:auto-onboard:after-schema-fix",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard"
+			]
+		},
+		{
+			"label": "check:tui-help-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"tui",
+				"--help"
+			]
+		},
+		{
+			"label": "check:tui-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"tui"
+			]
+		},
+		{
+			"label": "verify:status-no-profile-now",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"status"
+			]
+		},
+		{
+			"label": "verify:status-public-now",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"status"
+			]
+		},
+		{
+			"label": "diag:models-status-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"status"
+			]
+		},
+		{
+			"label": "diag:models-list-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"list"
+			]
+		},
+		{
+			"label": "diag:config-get-openai-key",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"config",
+				"get",
+				"providers.openai.apiKey"
+			]
+		},
+		{
+			"label": "diag:config-get-openai-auth",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"config",
+				"get",
+				"providers.openai"
+			]
+		},
+		{
+			"label": "diag:models-auth-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"--help"
+			]
+		},
+		{
+			"label": "diag:models-auth-login-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"login",
+				"--help"
+			]
+		},
+		{
+			"label": "diag:configure-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"configure",
+				"--help"
+			]
+		},
+		{
+			"label": "diag:auth-paste-key-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"paste-api-key",
+				"--help"
+			]
+		},
+		{
+			"label": "diag:auth-add-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"add",
+				"--help"
+			]
+		},
+		{
+			"label": "diag:auth-list-public",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"list"
+			]
+		},
+		{
+			"label": "diag:oauth-device-flow-openai",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"login",
+				"--provider",
+				"openai",
+				"--device-code"
+			]
+		},
+		{
+			"label": "diag:auth-paste-token-help",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"openclaw",
+				"--profile",
+				"public",
+				"models",
+				"auth",
+				"paste-token",
+				"--help"
+			]
+		},
+		{
+			"label": "diag:env-openai-key",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"exec",
+				"excalibot-product-owner",
+				"sh",
+				"-lc",
+				"if [ -n \"$OPENAI_API_KEY\" ]; then echo set; else echo missing; fi"
+			]
+		},
+		{
+			"label": "test:guardrail-auto-onboard",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"tests/test_cli.py",
+				"-k",
+				"auto_onboard or guardrail"
+			]
+		},
+		{
+			"label": "pytest:teardown-feature",
+			"type": "shell",
+			"command": "uv run pytest tests/test_cli.py -k \"teardown or remove_alias\""
+		},
+		{
+			"label": "pytest:test-cli-full",
+			"type": "shell",
+			"command": "uv run pytest tests/test_cli.py"
+		},
+		{
+			"label": "pytest:test-cli-full-rerun",
+			"type": "shell",
+			"command": "uv run pytest tests/test_cli.py"
+		},
+		{
+			"label": "pytest:test-render",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_render.py",
+				"-q"
+			]
+		},
+		{
+			"label": "check:make-help-teardown",
+			"type": "shell",
+			"command": "make help | rg \"teardown-example|teardown\""
+		},
+		{
+			"label": "diag:systemd-status-product-owner",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"status",
+				"excalibot-product-owner.service",
+				"--no-pager",
+				"-l"
+			]
+		},
+		{
+			"label": "diag:journal-product-owner",
+			"type": "shell",
+			"command": "journalctl",
+			"args": [
+				"--user-unit",
+				"excalibot-product-owner.service",
+				"-n",
+				"80",
+				"--no-pager"
+			]
+		},
+		{
+			"label": "diag:journal-developer",
+			"type": "shell",
+			"command": "journalctl",
+			"args": [
+				"--user-unit",
+				"excalibot-developer.service",
+				"-n",
+				"80",
+				"--no-pager"
+			]
+		},
+		{
+			"label": "diag:make-apply-exec-rerun",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "diag:restart-both-services",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"restart",
+				"excalibot-product-owner.service",
+				"excalibot-developer.service"
+			]
+		},
+		{
+			"label": "diag:status-product-owner-after-fix",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-product-owner.service"
+			]
+		},
+		{
+			"label": "diag:status-developer-after-fix",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-developer.service"
+			]
+		},
+		{
+			"label": "diag:status-developer-active-check-2",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"status",
+				"excalibot-developer.service",
+				"--no-pager",
+				"-l"
+			]
+		},
+		{
+			"label": "diag:pytest-apply-runtime-preflight",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply_execute_prepares_runtime_mount_paths or apply_execute_fails_when_workspace_missing or test_apply_execute",
+				"-q"
+			]
+		},
+		{
+			"label": "diag:ls-runtime-path-perms",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-ld",
+				"examples/workspaces/product-owner/.clawake/config",
+				"examples/workspaces/product-owner/.clawake/config/openclaw.json",
+				"examples/workspaces/product-owner/.clawake/state",
+				"examples/workspaces/developer/.clawake/config/openclaw.json"
+			]
+		},
+		{
+			"label": "diag:pytest-test-apply-execute-vv",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py::test_apply_execute",
+				"-vv"
+			]
+		},
+		{
+			"label": "diag:pytest-apply-runtime-preflight-rerun",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply_execute_prepares_runtime_mount_paths or apply_execute_fails_when_workspace_missing or test_apply_execute",
+				"-q"
+			]
+		},
+		{
+			"label": "diag:pytest-cli-apply-suite",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply",
+				"-q"
+			]
+		},
+		{
+			"label": "diag:git-status-short-now",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short"
+			]
+		},
+		{
+			"label": "diag:perm-state-openclaw-json",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/product-owner/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "diag:perm-state-dir",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-ld",
+				"examples/workspaces/product-owner/.clawake/state"
+			]
+		},
+		{
+			"label": "diag:perm-state-tree",
+			"type": "shell",
+			"command": "find",
+			"args": [
+				"examples/workspaces/product-owner/.clawake/state",
+				"-maxdepth",
+				"2",
+				"-printf",
+				"%M %u:%g %p\\n"
+			]
+		},
+		{
+			"label": "diag:find-uid100000-product-owner",
+			"type": "shell",
+			"command": "find",
+			"args": [
+				"examples/workspaces/product-owner/.clawake",
+				"-uid",
+				"100000",
+				"-o",
+				"-gid",
+				"100000"
+			]
+		},
+		{
+			"label": "diag:find-uid100000-developer",
+			"type": "shell",
+			"command": "find",
+			"args": [
+				"examples/workspaces/developer/.clawake",
+				"-uid",
+				"100000",
+				"-o",
+				"-gid",
+				"100000"
+			]
+		},
+		{
+			"label": "fix:remove-uid100000-openclaw-json",
+			"type": "shell",
+			"command": "rm",
+			"args": [
+				"-f",
+				"examples/workspaces/product-owner/.clawake/state/openclaw.json",
+				"examples/workspaces/developer/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:uid100000-cleared",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"find examples/workspaces/product-owner/.clawake examples/workspaces/developer/.clawake \\( -uid 100000 -o -gid 100000 \\) -print"
+			]
+		},
+		{
+			"label": "retest:make-apply-exec-after-perm-fix",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "verify:po-active-after-apply",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-product-owner.service"
+			]
+		},
+		{
+			"label": "verify:dev-active-after-apply",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-developer.service"
+			]
+		},
+		{
+			"label": "pytest:test-backup",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_backup.py",
+				"-q"
+			]
+		},
+		{
+			"label": "pytest:test-cli-apply-teardown",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"teardown or apply",
+				"-q"
+			]
+		},
+		{
+			"label": "repro:make-teardown-example-exec",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"teardown-example-exec"
+			]
+		},
+		{
+			"label": "repro:make-apply-exec-after-teardown",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "retest:apply-exec-warning-dedup",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "retest:pytest-backup-after-dedup",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_backup.py",
+				"-q"
+			]
+		},
+		{
+			"label": "diag:perm-dev-config-openclaw-json",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/developer/.clawake/config/openclaw.json"
+			]
+		},
+		{
+			"label": "diag:perm-dev-state-openclaw-json",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/developer/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "diag:perm-po-state-openclaw-json",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/product-owner/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "diag:find-uid100000-correct",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"find examples/workspaces -path '*/.clawake/*' \\( -uid 100000 -o -gid 100000 \\) -print"
+			]
+		},
+		{
+			"label": "diag:find-uid100000-correct-2",
+			"type": "shell",
+			"command": "find",
+			"args": [
+				"examples/workspaces",
+				"-path",
+				"*/.clawake/*",
+				"(",
+				"-uid",
+				"100000",
+				"-o",
+				"-gid",
+				"100000",
+				")",
+				"-print"
+			]
+		},
+		{
+			"label": "diag:find-uid100000-correct-3",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"find examples/workspaces -path '*/.clawake/*' \\( -uid 100000 -o -gid 100000 \\) -print"
+			]
+		},
+		{
+			"label": "pytest:test-render-after-user",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_render.py",
+				"-q"
+			]
+		},
+		{
+			"label": "pytest:test-backup-regression",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_backup.py",
+				"-q"
+			]
+		},
+		{
+			"label": "pytest:test-cli-apply-teardown-guard",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply or teardown",
+				"-q"
+			]
+		},
+		{
+			"label": "pytest:test-cli-apply-teardown-guard-rerun",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply or teardown",
+				"-q"
+			]
+		},
+		{
+			"label": "repro2:make-teardown-example-exec",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"teardown-example-exec"
+			]
+		},
+		{
+			"label": "repro2:make-apply-exec",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "retest:pytest-cli-apply-guard-cleanup",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply_execute_quarantines_unreadable_state_file or test_apply_execute",
+				"-q"
+			]
+		},
+		{
+			"label": "retest:pytest-cli-apply-guard-cleanup-2",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_cli.py",
+				"-k",
+				"apply_execute_quarantines_unreadable_state_file or test_apply_execute",
+				"-q"
+			]
+		},
+		{
+			"label": "repro3:make-apply-exec",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "repro3:make-teardown-example-exec",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"teardown-example-exec"
+			]
+		},
+		{
+			"label": "repro3:make-apply-exec-after-teardown",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "verify:po-active-final",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-product-owner.service"
+			]
+		},
+		{
+			"label": "verify:dev-active-final",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-developer.service"
+			]
+		},
+		{
+			"label": "diag:perm-config-openclaw-json-now",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/developer/.clawake/config/openclaw.json"
+			]
+		},
+		{
+			"label": "diag:perm-state-openclaw-json-now",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/developer/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "fix:repair-dev-state-openclaw-json-perms",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"rm -f examples/workspaces/developer/.clawake/state/openclaw.json && printf '{}\\n' > examples/workspaces/developer/.clawake/state/openclaw.json && chmod 600 examples/workspaces/developer/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:perm-dev-state-openclaw-json-fixed",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/developer/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:perm-po-state-openclaw-json-now",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/product-owner/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "fix:repair-po-state-openclaw-json-perms",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"rm -f examples/workspaces/product-owner/.clawake/state/openclaw.json && printf '{}\\n' > examples/workspaces/product-owner/.clawake/state/openclaw.json && chmod 600 examples/workspaces/product-owner/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:perm-po-state-openclaw-json-fixed",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/product-owner/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:perm-config-openclaw-json-still-ok",
+			"type": "shell",
+			"command": "ls",
+			"args": [
+				"-l",
+				"examples/workspaces/developer/.clawake/config/openclaw.json"
+			]
+		},
+		{
+			"label": "verify:make-apply-exec-after-perm-repair",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"apply-exec"
+			]
+		},
+		{
+			"label": "pytest:test-config-focused",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"-q",
+				"tests/test_config.py"
+			]
+		},
+		{
+			"label": "diag:new-runtime-owner-check",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"ls -lna ~/.local/share/clawake/instances/excalibot-product-owner/state/openclaw.json ~/.local/share/clawake/instances/excalibot-developer/state/openclaw.json 2>/dev/null || true"
+			]
+		},
+		{
+			"label": "diag:restart-counters",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"systemctl --user show excalibot-product-owner.service -p ActiveState -p SubState -p NRestarts && echo '---' && systemctl --user show excalibot-developer.service -p ActiveState -p SubState -p NRestarts"
+			]
+		},
+		{
+			"label": "diag:last-config-errors",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"journalctl --user-unit excalibot-product-owner.service -n 20 --no-pager | rg -n 'missing gateway.mode|Gateway start blocked|Started|Failed' || true; echo '---'; journalctl --user-unit excalibot-developer.service -n 20 --no-pager | rg -n 'missing gateway.mode|Gateway start blocked|Started|Failed' || true"
+			]
+		},
+		{
+			"label": "diag:podman-uptime",
+			"type": "shell",
+			"command": "podman",
+			"args": [
+				"ps",
+				"--format",
+				"table {{.Names}}\\t{{.Status}}\\t{{.Image}}"
+			]
+		},
+		{
+			"label": "diag:last-config-errors-fixed",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"journalctl --user-unit excalibot-product-owner.service -n 20 --no-pager | rg -n \"missing gateway.mode|Gateway start blocked|Started .*service|Failed with result\" || true; echo '---'; journalctl --user-unit excalibot-developer.service -n 20 --no-pager | rg -n \"missing gateway.mode|Gateway start blocked|Started .*service|Failed with result\" || true"
+			]
+		},
+		{
+			"label": "diag:runtime-config-check",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"echo 'PO:' && cat ~/.local/share/clawake/instances/excalibot-product-owner/config/openclaw.json && echo && echo 'DEV:' && cat ~/.local/share/clawake/instances/excalibot-developer/config/openclaw.json"
+			]
+		},
+		{
+			"label": "pytest:test-onboarding",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"tests/test_onboarding.py",
+				"-q"
+			]
+		},
+		{
+			"label": "diag:git-ls-files-sensitive",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"ls-files",
+				"--",
+				"examples/staff/env/product-owner.env",
+				".clawake/instances/excalibot-product-owner/state/openclaw.json",
+				".clawake/**"
+			]
+		},
+		{
+			"label": "diag:git-check-ignore-product-owner-env",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"check-ignore",
+				"-v",
+				"examples/staff/env/product-owner.env"
+			]
+		},
+		{
+			"label": "diag:git-ls-error-unmatch-product-owner-env",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"ls-files",
+				"--error-unmatch",
+				"examples/staff/env/product-owner.env"
+			]
+		},
+		{
+			"label": "diag:git-status-product-owner-env-only",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"--",
+				"examples/staff/env/product-owner.env"
+			]
+		},
+		{
+			"label": "verify:make-setup-quadlets",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"setup-quadlets"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "pytest:test-onboarding-now",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"pytest",
+				"-q",
+				"tests/test_onboarding.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify:setup-exec-developer-fix",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"setup-quadlets-exec",
+				"MEMBER=excalibot-developer"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify:restart-developer-after-fix",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"restart-quadlets-exec",
+				"MEMBER=excalibot-developer"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify:status-developer-text-now",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"status-quadlets",
+				"MEMBER=excalibot-developer"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify:is-active-developer-now",
+			"type": "shell",
+			"command": "systemctl",
+			"args": [
+				"--user",
+				"is-active",
+				"excalibot-developer.service"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify:cli-help-lifecycle-only",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"clawake",
+				"--help"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify:make-test-lifecycle",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"test-lifecycle",
+				"MEMBER=excalibot-developer"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "diag:setup-quadlets-exec-now",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"setup-quadlets-exec"
+			]
+		},
+		{
+			"label": "diag:host-openclaw-json-state",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"echo 'PO:' && ls -l examples/workspaces/product-owner/.clawake/state/openclaw.json && cat examples/workspaces/product-owner/.clawake/state/openclaw.json && echo '---' && echo 'DEV:' && ls -l examples/workspaces/developer/.clawake/state/openclaw.json && cat examples/workspaces/developer/.clawake/state/openclaw.json"
+			]
+		},
+		{
+			"label": "fix:remove-state-openclaw-json-both",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"rm -f examples/workspaces/product-owner/.clawake/state/openclaw.json examples/workspaces/developer/.clawake/state/openclaw.json && echo removed"
+			]
+		},
+		{
+			"label": "diag:onboard-plan-po-current",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"python",
+				"-c",
+				"from pathlib import Path; import json; from clawake.config import load_inventory; from clawake.services.onboarding import build_auto_onboard_plan; inv=load_inventory(Path('examples/staff/team.yml')); inst=[i for i in inv.instances if i.name=='excalibot-product-owner'][0]; plan=build_auto_onboard_plan(inst); print(json.dumps(plan.config, indent=2, sort_keys=True))"
+			]
+		},
+		{
+			"label": "diag:onboard-plan-po-current-2",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"uv run python - <<'PY'\nfrom pathlib import Path\nimport json\nfrom clawake.config import load_inventory\nfrom clawake.services.onboarding import build_auto_onboard_plan\ninv = load_inventory(Path(\"examples/staff/team.yml\"))\ninst = [i for i in inv.instances if i.name == \"excalibot-product-owner\"][0]\nplan = build_auto_onboard_plan(inst)\nprint(json.dumps(plan.config, indent=2, sort_keys=True))\nprint('MISSING', plan.missing_required_env)\nPY"
+			]
+		},
+		{
+			"label": "diag:journal-product-owner-latest-20",
+			"type": "shell",
+			"command": "journalctl",
+			"args": [
+				"--user-unit",
+				"excalibot-product-owner.service",
+				"-n",
+				"20",
+				"--no-pager"
+			]
+		},
+		{
+			"label": "diag:onboard-plan-po-after-fix",
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"-lc",
+				"uv run python - <<'PY'\nfrom pathlib import Path\nimport json\nfrom clawake.config import load_inventory\nfrom clawake.services.onboarding import build_auto_onboard_plan, auto_onboard_would_change\ninv = load_inventory(Path('examples/staff/team.yml'))\ninst = [i for i in inv.instances if i.name == 'excalibot-product-owner'][0]\nplan = build_auto_onboard_plan(inst)\nprint(json.dumps(plan.config, indent=2, sort_keys=True))\nprint('would_change=', auto_onboard_would_change(plan))\nprint('target=', plan.target_path)\nPY"
+			]
+		},
+		{
+			"label": "diag:onboard-plan-po-after-fix-2",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"uv run python - <<\"PY\"\nfrom pathlib import Path\nimport json\nfrom clawake.config import load_inventory\nfrom clawake.services.onboarding import build_auto_onboard_plan, auto_onboard_would_change\ninv = load_inventory(Path(\"examples/staff/team.yml\"))\ninst = [i for i in inv.instances if i.name == \"excalibot-product-owner\"][0]\nplan = build_auto_onboard_plan(inst)\nprint(json.dumps(plan.config, indent=2, sort_keys=True))\nprint(\"would_change\", auto_onboard_would_change(plan))\nprint(\"target\", plan.target_path)\nPY"
+			]
+		},
+		{
+			"label": "diag:onboard-plan-po-change-check",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"uv run python - <<\"PY\"\nfrom pathlib import Path\nfrom clawake.config import load_inventory\nfrom clawake.services.onboarding import build_auto_onboard_plan, auto_onboard_would_change\ninv = load_inventory(Path(\"examples/staff/team.yml\"))\ninst = [i for i in inv.instances if i.name == \"excalibot-product-owner\"][0]\nplan = build_auto_onboard_plan(inst)\nprint(auto_onboard_would_change(plan))\nPY"
+			]
+		},
+		{
+			"label": "diag:po-active-and-errors-tail",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"systemctl --user is-active excalibot-product-owner.service && echo '---' && journalctl --user-unit excalibot-product-owner.service -n 12 --no-pager"
+			]
+		},
+		{
+			"label": "diag:uv-module-path-onboarding",
+			"type": "shell",
+			"command": "uv",
+			"args": [
+				"run",
+				"python",
+				"-c",
+				"import clawake.services.onboarding as o,inspect; print(o.__file__); print(hasattr(o,'auto_onboard_would_change')); print(inspect.getsource(o.auto_onboard_would_change) if hasattr(o,'auto_onboard_would_change') else 'missing')"
+			]
+		},
+		{
+			"label": "diag:uv-module-path-onboarding-2",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"uv run python - <<\"PY\"\nimport inspect\nimport clawake.services.onboarding as o\nprint(o.__file__)\nprint(hasattr(o, \"auto_onboard_would_change\"))\nif hasattr(o, \"auto_onboard_would_change\"):\n    print(inspect.getsource(o.auto_onboard_would_change))\nPY"
+			]
+		},
+		{
+			"label": "diag:print-plan-target-and-content",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"uv run python - <<\"PY\"\nfrom pathlib import Path\nfrom clawake.config import load_inventory\nfrom clawake.services.onboarding import build_auto_onboard_plan\ninv=load_inventory(Path(\"examples/staff/team.yml\"))\ninst=[i for i in inv.instances if i.name==\"excalibot-product-owner\"][0]\nplan=build_auto_onboard_plan(inst)\nprint(plan.target_path)\nprint(plan.target_path.read_text())\nPY"
+			]
+		},
+		{
+			"label": "diag:po-errors-since-now",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"echo \"state=$(systemctl --user is-active excalibot-product-owner.service)\" && journalctl --user-unit excalibot-product-owner.service -n 25 --no-pager | rg -n \"invalid config|additional properties|Gateway failed to start\" || true"
+			]
+		}
+	]
 }

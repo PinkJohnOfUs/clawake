@@ -87,10 +87,8 @@ class InstanceSpec(BaseModel):
     name: str
     host: str
     role: Literal["product_owner", "developer"]
-    profile: Literal["public", "internal"]
     workspace_path: str
-    config_path: str | None = None
-    state_path: str | None = None
+    team_definition_path: str
     service_scope: Literal["user"] = "user"
     quadlet_path: str
     container_name: str
@@ -108,23 +106,11 @@ class InstanceSpec(BaseModel):
     dashboard: DashboardMeta
 
     @model_validator(mode="after")
-    def ensure_storage_defaults(self) -> InstanceSpec:
-        runtime_root = Path(
-            os.environ.get("CLAWAKE_RUNTIME_ROOT", "~/.local/share/clawake/instances")
-        ).expanduser() / self.name
-        if not self.config_path:
-            self.config_path = str(runtime_root / "config")
-        if not self.state_path:
-            self.state_path = str(runtime_root / "state")
-        return self
-
-    @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:
         if not self.backup_policy.paths:
             self.backup_policy.paths = [
                 self.workspace_path,
-                self.config_path,
-                self.state_path,
+                self.team_definition_path,
             ]
         return self
 
@@ -184,12 +170,8 @@ class Inventory(BaseModel):
                 instance.workspace_path,
             )
             _validate_safe_absolute_path(
-                f"instances[{instance.name}].config_path",
-                instance.config_path,
-            )
-            _validate_safe_absolute_path(
-                f"instances[{instance.name}].state_path",
-                instance.state_path,
+                f"instances[{instance.name}].team_definition_path",
+                instance.team_definition_path,
             )
             for env_file in instance.env_files:
                 _validate_safe_absolute_path(
@@ -234,8 +216,7 @@ class Inventory(BaseModel):
 
             storage_paths = {
                 "workspace_path": instance.workspace_path,
-                "config_path": instance.config_path,
-                "state_path": instance.state_path,
+                "team_definition_path": instance.team_definition_path,
             }
             for boundary, raw_path in storage_paths.items():
                 normalized = _expand_path(raw_path)

@@ -11,8 +11,8 @@ UserNS=keep-id:uid=1000,gid=1000
 EnvironmentFile={{ env_file }}
 {% endfor %}
 Volume={{ instance.workspace_path }}:/workspace
-Volume={{ instance.state_path }}:/home/node/.openclaw-{{ instance.profile }}
-Volume={{ instance.state_path }}/workspace-{{ instance.profile }}:/home/node/.openclaw/workspace-{{ instance.profile }}
+Volume={{ instance.team_definition_path }}:/team-definition:ro
+Volume={{ instance.workspace_path }}/.openclaw/openclaw.json:/home/node/.openclaw/openclaw.json
 {% for mount in instance.mounts %}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
 {% endfor %}
@@ -20,11 +20,10 @@ Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' 
 PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
 {% endfor %}
 {% if instance.gateway_runtime.enabled %}
-Exec=openclaw --profile {{ instance.profile }} gateway run --bind {{ instance.gateway_runtime.bind }} --port {{ instance.gateway_runtime.gateway_container_port }}
+Exec=openclaw gateway run --bind {{ instance.gateway_runtime.bind }} --port {{ instance.gateway_runtime.gateway_container_port }}
 {% endif %}
 Label=clawake.instance={{ instance.name }}
 Label=clawake.role={{ instance.role }}
-Label=clawake.profile={{ instance.profile }}
 {% for key, value in instance.labels.items() %}
 Label={{ key }}={{ value }}
 {% endfor %}

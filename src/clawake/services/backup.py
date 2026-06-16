@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 def backup_sources(instance: InstanceSpec) -> list[Path]:
     ordered = [
         Path(instance.workspace_path).expanduser(),
-        Path(instance.config_path).expanduser(),
-        Path(instance.state_path).expanduser(),
+        Path(instance.team_definition_path).expanduser(),
     ]
     ordered.extend(Path(path).expanduser() for path in instance.backup_policy.paths)
 
