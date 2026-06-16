@@ -27,7 +27,15 @@ def _is_sensitive_env_key(key: str) -> bool:
 def _is_env_reference(value: object) -> bool:
     if not isinstance(value, str):
         return False
-    return value.startswith(_REQUIRED_PREFIX) or value.startswith(_OPTIONAL_PREFIX)
+    return (
+        value.startswith(_REQUIRED_PREFIX)
+        or value.startswith(_OPTIONAL_PREFIX)
+        or (value.startswith("${") and value.endswith("}"))
+    )
+
+
+def _runtime_env_reference(key: str) -> str:
+    return f"${{{key}}}"
 
 
 @dataclass
@@ -84,9 +92,9 @@ def _resolve_template_value(
         if value.startswith(_OPTIONAL_PREFIX):
             key = value[len(_OPTIONAL_PREFIX) :]
             if key not in env:
-                return value
+                return _runtime_env_reference(key)
             if _is_sensitive_env_key(key):
-                return value
+                return _runtime_env_reference(key)
             return env[key]
         if value.startswith(_REQUIRED_PREFIX):
             key = value[len(_REQUIRED_PREFIX) :]
@@ -94,7 +102,7 @@ def _resolve_template_value(
                 missing_required_env.add(key)
                 return None
             if _is_sensitive_env_key(key):
-                return value
+                return _runtime_env_reference(key)
             return env[key]
         return value
 

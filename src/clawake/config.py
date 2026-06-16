@@ -107,12 +107,35 @@ class InstanceSpec(BaseModel):
 
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:
+        quadlet = Path(self.quadlet_path)
+        if quadlet.suffix != ".container":
+            raise ValueError(
+                f"instances[{self.name}].quadlet_path must end with '.container': "
+                f"'{self.quadlet_path}'"
+            )
         if not self.backup_policy.paths:
             self.backup_policy.paths = [
                 self.workspace_path,
                 self.team_definition_path,
             ]
         return self
+
+    @property
+    def network_quadlet_path(self) -> str:
+        return str(Path(self.quadlet_path).with_suffix(".network"))
+
+    @property
+    def runtime_volume_quadlet_path(self) -> str:
+        container_path = Path(self.quadlet_path)
+        return str(container_path.with_name(f"{container_path.stem}-state.volume"))
+
+    @property
+    def quadlet_artifact_paths(self) -> list[str]:
+        return [
+            self.quadlet_path,
+            self.network_quadlet_path,
+            self.runtime_volume_quadlet_path,
+        ]
 
 
 class Inventory(BaseModel):

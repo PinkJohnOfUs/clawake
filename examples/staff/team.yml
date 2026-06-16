@@ -18,12 +18,12 @@ instances:
       repository: ghcr.io/openclaw/openclaw
       tag: "2026.6.5"
     ports:
-      - bind_address: 0.0.0.0
-        host_port: 9010
+      - bind_address: 127.0.0.1
+        host_port: 18789
         container_port: 18789
         protocol: tcp
-      - bind_address: 0.0.0.0
-        host_port: 9012
+      - bind_address: 127.0.0.1
+        host_port: 18790
         container_port: 18790
         protocol: tcp
     env_files:
@@ -33,7 +33,7 @@ instances:
       audience: external
     gateway_runtime:
       enabled: true
-      bind: loopback
+      bind: lan
     auto_onboard:
       required_env:
         - OPENCLAW_GATEWAY_BIND
@@ -86,7 +86,7 @@ instances:
       audience: internal
     gateway_runtime:
       enabled: true
-      bind: loopback
+      bind: lan
     auto_onboard:
       required_env:
         - OPENCLAW_GATEWAY_BIND

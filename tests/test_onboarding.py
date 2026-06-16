@@ -160,8 +160,8 @@ instances:
     plan = build_auto_onboard_plan(_load_instance(cfg))
 
     assert plan.missing_required_env == []
-    assert plan.config["gateway"]["auth"]["token"] == "$ENV:OPENCLAW_GATEWAY_TOKEN"
-    assert plan.config["channels"]["discord"]["token"] == "$ENV?:DISCORD_BOT_TOKEN"
+    assert plan.config["gateway"]["auth"]["token"] == "${OPENCLAW_GATEWAY_TOKEN}"
+    assert plan.config["channels"]["discord"]["token"] == "${DISCORD_BOT_TOKEN}"
 
 
 def test_build_auto_onboard_plan_keeps_sensitive_env_reference(tmp_path: Path) -> None:
@@ -207,7 +207,7 @@ instances:
 
     assert plan.missing_required_env == []
     assert plan.config["gateway"]["mode"] == "local"
-    assert plan.config["gateway"]["auth"]["token"] == "$ENV:OPENCLAW_GATEWAY_TOKEN"
+    assert plan.config["gateway"]["auth"]["token"] == "${OPENCLAW_GATEWAY_TOKEN}"
 
 
 def test_build_auto_onboard_plan_keeps_missing_optional_reference(tmp_path: Path) -> None:

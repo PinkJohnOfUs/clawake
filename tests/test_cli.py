@@ -1359,6 +1359,42 @@ def test_teardown_quadlets_member_alias() -> None:
     assert "excalibot-product-owner" in result.output
 
 
+def test_diagnose_dashboard_text_default_hides_token_url() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "diagnose-dashboard",
+            "--config",
+            str(Path("examples/staff/team.yml")),
+            "--member",
+            "excalibot-product-owner",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Dashboard diagnosis for cluster" in result.output
+    assert "dashboard: http://127.0.0.1:18789/" in result.output
+    assert "token_present: yes" in result.output
+    assert "auth_url:" not in result.output
+
+
+def test_diagnose_dashboard_show_token_url() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "diagnose-dashboard",
+            "--config",
+            str(Path("examples/staff/team.yml")),
+            "--member",
+            "excalibot-product-owner",
+            "--show-token-url",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "auth_url: http://127.0.0.1:18789/#token=dev-product-owner-token" in result.output
+
+
 def test_setup_quadlets_execute_writes_openclaw_config(
     monkeypatch: object,
     tmp_path: Path,

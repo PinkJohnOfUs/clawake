@@ -291,3 +291,32 @@ instances:
 
     with pytest.raises(ValueError, match="must be an absolute path"):
         load_inventory(cfg)
+
+
+def test_quadlet_path_must_end_with_container(tmp_path: Path) -> None:
+    cfg = tmp_path / "invalid-quadlet-path.yaml"
+    cfg.write_text(
+        """
+version: 1
+cluster:
+  name: c
+  mode: single_host
+  primary_host: a
+hosts:
+  - name: a
+instances:
+  - name: one
+    host: a
+    role: developer
+    workspace_path: /srv/a/one/workspace
+    team_definition_path: /srv/a/one/role
+    quadlet_path: one.service
+    container_name: one
+    image: {repository: ghcr.io/x, tag: "1"}
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="must end with '.container'"):
+        load_inventory(cfg)

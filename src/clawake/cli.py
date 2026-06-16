@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Annotated, Literal
@@ -17,7 +18,7 @@ from clawake.services.onboarding import (
     build_auto_onboard_plan,
     write_auto_onboard_config,
 )
-from clawake.services.render import image_ref, render_instance
+from clawake.services.render import image_ref, render_instance_assets
 from clawake.services.systemd import CommandResult, SystemdService
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -28,6 +29,9 @@ ConfigPath = Annotated[Path, typer.Option(..., "--config", "-c", exists=True, di
 OptionalMemberName = Annotated[str | None, typer.Option("--member", "-m")]
 ExecuteFlag = Annotated[bool, typer.Option("--execute")]
 StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
+ShowTokenUrlFlag = Annotated[bool, typer.Option("--show-token-url")]
+
+_ENV_LINE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
 
 def _load(path: Path) -> Inventory:
@@ -240,6 +244,100 @@ def _is_tolerated_teardown_error(result: CommandResult) -> bool:
     return any(marker in details for marker in tolerated_markers)
 
 
+def _load_env_file_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists() or not path.is_file():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not _ENV_LINE_PATTERN.fullmatch(line):
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+def _instance_env_values(instance: InstanceSpec) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for raw_path in instance.env_files:
+        merged.update(_load_env_file_values(Path(raw_path).expanduser()))
+    return merged
+
+
+def _dashboard_host_url(instance: InstanceSpec) -> str:
+    gateway_port = instance.gateway_runtime.gateway_container_port
+    published_gateway_port = next(
+        (
+            port
+            for port in instance.ports
+            if port.container_port == gateway_port and port.protocol == "tcp"
+        ),
+        None,
+    )
+    host_port = published_gateway_port.host_port if published_gateway_port else gateway_port
+    return f"http://127.0.0.1:{host_port}/"
+
+
+@app.command("diagnose-dashboard")
+def diagnose_dashboard(
+    config: ConfigPath,
+    member: OptionalMemberName = None,
+    format: StatusFormat = "text",
+    show_token_url: ShowTokenUrlFlag = False,
+) -> None:
+    """Show dashboard URLs and token diagnostics for selected members."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    if not selected:
+        typer.echo("No matching members selected for dashboard diagnosis")
+        return
+
+    rows: list[dict[str, object]] = []
+    for instance in selected:
+        dashboard_url = _dashboard_host_url(instance)
+        env_values = _instance_env_values(instance)
+        token = env_values.get("OPENCLAW_GATEWAY_TOKEN", "")
+        auth_url = f"{dashboard_url}#token={token}" if token else None
+        row = {
+            "instance": instance.name,
+            "role": instance.role,
+            "dashboard_url": dashboard_url,
+            "token_present": bool(token),
+            "token_env_key": "OPENCLAW_GATEWAY_TOKEN",
+            "token_env_files": [str(Path(path).expanduser()) for path in instance.env_files],
+            "auth_url": auth_url if show_token_url else None,
+        }
+        rows.append(row)
+
+    if format == "json":
+        typer.echo(
+            json.dumps(
+                {
+                    "cluster": inventory.cluster.name,
+                    "mode": inventory.cluster.mode,
+                    "instances": rows,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    typer.echo(f"Dashboard diagnosis for cluster '{inventory.cluster.name}'")
+    for row in rows:
+        typer.echo(f"- {row['instance']} [{row['role']}]")
+        typer.echo(f"  dashboard: {row['dashboard_url']}")
+        typer.echo(f"  token_env_key: {row['token_env_key']}")
+        typer.echo(f"  token_present: {'yes' if row['token_present'] else 'no'}")
+        for env_file in row["token_env_files"]:
+            typer.echo(f"  env_file: {env_file}")
+        if show_token_url and row["auth_url"]:
+            typer.echo(f"  auth_url: {row['auth_url']}")
+        elif row["token_present"]:
+            typer.echo("  hint: re-run with --show-token-url to print URL fragment auth")
+
+
 @app.command("setup-quadlets")
 def setup_quadlets(
     config: ConfigPath,
@@ -257,30 +355,32 @@ def setup_quadlets(
     output.mkdir(parents=True, exist_ok=True)
     template_root = _template_root()
     host_map = {host.name: host for host in inventory.hosts}
-    changed: list[tuple[InstanceSpec, Path, Path]] = []
+    changed_artifacts: list[tuple[InstanceSpec, Path, Path]] = []
+    changed_instance_names: set[str] = set()
 
     for instance in selected:
-        rendered_text = render_instance(instance, template_root=template_root)
-        rendered_file = output / instance.quadlet_path
-        rendered_file.parent.mkdir(parents=True, exist_ok=True)
-        rendered_file.write_text(rendered_text, encoding="utf-8")
-
         host = host_map[instance.host]
-        destination = Path(host.quadlet_root).expanduser() / instance.quadlet_path
-        current_text = destination.read_text(encoding="utf-8") if destination.exists() else ""
-        if current_text != rendered_text:
-            changed.append((instance, rendered_file, destination))
+        for relative_path, rendered_text in render_instance_assets(
+            instance,
+            template_root=template_root,
+        ).items():
+            rendered_file = output / relative_path
+            rendered_file.parent.mkdir(parents=True, exist_ok=True)
+            rendered_file.write_text(rendered_text, encoding="utf-8")
+
+            destination = Path(host.quadlet_root).expanduser() / relative_path
+            current_text = destination.read_text(encoding="utf-8") if destination.exists() else ""
+            if current_text != rendered_text:
+                changed_artifacts.append((instance, rendered_file, destination))
+                changed_instance_names.add(instance.name)
 
     typer.echo(
         f"Setup plan for cluster '{inventory.cluster.name}' ({inventory.cluster.mode}): "
-        f"{len(changed)}/{len(selected)} member(s) changed"
+        f"{len(changed_instance_names)}/{len(selected)} member(s) changed"
     )
 
-    for instance, rendered_file, destination in changed:
-        typer.echo(
-            f" - {instance.name} [{instance.role}] "
-            f"{rendered_file} -> {destination}"
-        )
+    for instance, rendered_file, destination in changed_artifacts:
+        typer.echo(f" - {instance.name} [{instance.role}] {rendered_file} -> {destination}")
 
     auto_onboard_repairs: list[tuple[InstanceSpec, AutoOnboardPlan]] = []
     for instance in selected:
@@ -301,7 +401,9 @@ def setup_quadlets(
             auto_onboard_repairs.append((instance, plan))
 
     if not execute:
-        for instance, _, _ in changed:
+        for instance in selected:
+            if instance.name not in changed_instance_names:
+                continue
             for action in _prepare_runtime_mounts(instance, execute=False):
                 typer.echo(action)
             for action in _repair_runtime_state_file(instance, execute=False):
@@ -316,17 +418,21 @@ def setup_quadlets(
     service = SystemdService()
     failed = False
     restart_targets: list[str] = []
+    prepared_instances: set[str] = set()
 
-    for instance, rendered_file, destination in changed:
-        for action in _prepare_runtime_mounts(instance, execute=True):
-            typer.echo(action)
-        for action in _repair_runtime_state_file(instance, execute=True):
-            typer.echo(action)
+    for instance, rendered_file, destination in changed_artifacts:
+        if instance.name not in prepared_instances:
+            for action in _prepare_runtime_mounts(instance, execute=True):
+                typer.echo(action)
+            for action in _repair_runtime_state_file(instance, execute=True):
+                typer.echo(action)
+            prepared_instances.add(instance.name)
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(rendered_file, destination)
         typer.echo(f"Deployed {rendered_file} -> {destination}")
-        restart_targets.append(instance.name)
+        if instance.name not in restart_targets:
+            restart_targets.append(instance.name)
 
     if auto_onboard_repairs:
         for instance, plan in auto_onboard_repairs:
@@ -341,7 +447,7 @@ def setup_quadlets(
     _print_result(reload_result)
     failed = failed or reload_result.return_code != 0
 
-    if not changed and not auto_onboard_repairs:
+    if not changed_artifacts and not auto_onboard_repairs:
         typer.echo("No rendered changes detected; daemon-reload completed.")
 
     for instance_name in restart_targets:
@@ -465,15 +571,19 @@ def teardown_quadlets(
 
     for chosen in selected:
         host = host_map[chosen.host]
-        quadlet_target = Path(host.quadlet_root).expanduser() / chosen.quadlet_path
+        quadlet_targets = [
+            Path(host.quadlet_root).expanduser() / artifact_path
+            for artifact_path in chosen.quadlet_artifact_paths
+        ]
 
         typer.echo(f"- Teardown {chosen.name} [{chosen.role}]")
         results = [
             service.stop(chosen.name, execute=execute),
             service.disable(chosen.name, execute=execute),
-            service.remove_quadlet(str(quadlet_target), execute=execute),
             service.remove_container(chosen.container_name, execute=execute),
         ]
+        for quadlet_target in quadlet_targets:
+            results.append(service.remove_quadlet(str(quadlet_target), execute=execute))
         for result in results:
             _print_result(result)
             if result.return_code != 0 and not _is_tolerated_teardown_error(result):

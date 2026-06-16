@@ -1,98 +1,228 @@
 # User Journey: Clawake
 
-## Ausgangslage
+## Platform Overview
 
-Ich nutze Clawake als Stakeholder unseres Produkts. Ich denke in Mitarbeitern: jede OpenClaw-Instanz ist ein eigenstaendiger Mitarbeiter mit einer klaren Rolle.
+```mermaid
+flowchart TD
+	U[Operator via CLI or VS Code] --> C[Clawake Lifecycle Commands]
+	C --> S[systemd --user]
+	S --> Q1[Quadlet Unit: openclaw-product-owner.container]
+	S --> Q2[Quadlet Unit: openclaw-developer.container]
 
-## Rollenbild
+	Q1 --> P1[Rootless Podman Container\nOpenClaw Product Owner]
+	Q2 --> P2[Rootless Podman Container\nOpenClaw Developer]
 
-- Nutzer: Ich bediene Clawake ueber CLI und VS Code Launch-Konfigurationen.
-- Kunde: Ich bewerte, ob das System fuer reale Produktarbeit taugt.
-- Stakeholder: Ich entscheide, welche Mitarbeiter wir erstellen, betreiben und absichern.
+	W1[Host Workspace: product-owner] -->|bind mount| P1
+	R1[Host Role Definition: ROLE.md] -->|read-only bind mount| P1
+	O1[Host Runtime Dir: .openclaw] -->|bind mount| P1
 
-## Arbeitsmodell
+	W2[Host Workspace: developer] -->|bind mount| P2
+	R2[Host Role Definition: ROLE.md] -->|read-only bind mount| P2
+	O2[Host Runtime Dir: .openclaw] -->|bind mount| P2
+```
 
-- Mitarbeiterdefinitionen liegen als staff-Dateien vor.
-- Beispiele liegen unter `examples/staff/`.
-- Betriebskonfigurationen liegen unter `staff/`.
-- Der Betrieb erfolgt ueber einen kleinen Satz klarer Lifecycle-Kommandos.
+Clawake treats each OpenClaw instance as an independent team member, encapsulated in a rootless container and managed by systemd user services through Quadlet.
 
-## Erste Journey-Etappe: Lifecycle zuerst
+## Starting Point
 
-Startpunkt sind die vier zentralen Kommandos aus der Architektur:
+I use Clawake as a product stakeholder and evaluate it from an operational point of view. My mental model is team-oriented: each OpenClaw instance is one autonomous team member with a clearly defined role.
 
-0. `make install-dev`
-1. `clawake setup-quadlets --config|-c <staff.yaml>` (Preview)
-2. `clawake setup-quadlets --config|-c <staff.yaml> --execute` (Mutation)
-3. `clawake restart-quadlets --config|-c <staff.yaml>` (Preview)
-4. `clawake restart-quadlets --config|-c <staff.yaml> [--member <name>] --execute` (Mutation)
-5. `clawake status-quadlets --config|-c <staff.yaml> [--format text|json]`
-6. `clawake teardown-quadlets --config|-c <staff.yaml> [--member <name>]` (Preview)
-7. `clawake teardown-quadlets --config|-c <staff.yaml> [--member <name>] --execute` (Mutation)
+## Perspective and Responsibilities
 
-Ziel dieser Etappe:
-- verstehen, wie schnell ein Team vollstaendig in Betrieb genommen werden kann
-- pruefen, ob Lifecycle-Aktionen ohne Infrastrukturwissen ausfuehrbar sind
-- Sicherheitsgrenzen frueh sichtbar machen (Mounts, Ports, gezielte Reichweite)
+- Developer: I operate Clawake through CLI commands and VS Code launch configurations.
+- Customer: I evaluate whether the platform is viable for real product work.
+- Stakeholder: I decide which team members we create, run, and secure.
 
-## Launch-Konfigurationen fuer Erprobung
+## Operating Model
 
-Fuer die erste Erprobung nutzen wir in VS Code:
+- Team member definitions are stored in staff files.
+- Example definitions are located in examples/staff.
+- Runtime operation definitions are located in staff.
+- Day-to-day operation is handled through a small, explicit lifecycle command set.
+
+## Phase 1 Journey: Lifecycle First
+
+The initial milestone is to validate the core lifecycle flow end to end.
+
+1. make install-dev
+2. clawake setup-quadlets --config|-c <staff.yaml> (preview)
+3. clawake setup-quadlets --config|-c <staff.yaml> --execute (mutation)
+4. clawake restart-quadlets --config|-c <staff.yaml> (preview)
+5. clawake restart-quadlets --config|-c <staff.yaml> [--member <name>] --execute (mutation)
+6. clawake status-quadlets --config|-c <staff.yaml> [--format text|json]
+7. clawake teardown-quadlets --config|-c <staff.yaml> [--member <name>] (preview)
+8. clawake teardown-quadlets --config|-c <staff.yaml> [--member <name>] --execute (mutation)
+
+### Goals of This Stage
+
+- Measure how quickly a full team can be brought into service.
+- Verify that lifecycle actions are executable without deep infrastructure knowledge.
+- Surface security boundaries early, especially mounts, ports, and exposure scope.
+
+## VS Code Trial Setup
+
+For the first hands-on validation, use these launch configurations:
 
 - Clawake: setup-quadlets
 - Clawake: status-quadlets
 
-Konfigurationsbasis:
-- `examples/staff/team.yml`
+Configuration baseline:
 
-## Beobachtungsprotokoll
+- examples/staff/team.yml
 
-### Runde 1: Setup
+## Observation Log
 
-- Erwartung: Team-Mitglieder werden als Quadlets bereitgestellt, ohne dass ich systemd-Details kennen muss.
-- Beobachtung: Setup zeigt im Dry-Run die geplanten Aenderungen und setzt erst mit `--execute` um.
-- Erkenntnis: Das mentale Modell ist klar: Team-Definition rein, laufende Services raus.
-- Offene Frage: Sollen Setup-Ausgaben standardmaessig pro Rolle gruppiert werden?
+### Round 1: Setup
 
-### Runde 2: Restart
+- Expectation: Team members are provisioned as Quadlet units without requiring systemd internals.
+- Observation: Dry-run previews all planned changes and applies only with --execute.
+- Insight: The model is intuitive: team definition in, managed services out.
+- Open question: Should setup output be grouped by role by default?
 
-- Erwartung: Nach Konfigurations- oder Imagewechseln werden nur relevante Mitglieder neu gestartet.
-- Beobachtung: Restart folgt demselben Safety-Muster (Preview vor Mutation).
-- Erkenntnis: Gezielte Neustarts reduzieren Risiko und beschleunigen den Betrieb.
-- Offene Frage: Brauchen wir einen interaktiven Bestatigungsschritt bei Team-weiten Restarts?
+### Round 2: Restart
 
-### Runde 3: Status
+- Expectation: After config or image changes, only relevant members are restarted.
+- Observation: Restart follows the same safety pattern: preview before mutation.
+- Insight: Targeted restarts reduce risk and improve operational speed.
+- Open question: Do we need an interactive confirmation for team-wide restarts?
 
-- Erwartung: Status zeigt Team-Zustand in einer kompakten, stakeholder-tauglichen Sicht.
-- Beobachtung: Jede Rolle ist mit Laufzustand und Basis-Checks sichtbar.
-- Erkenntnis: Der Health-Ueberblick funktioniert als zentrale Betriebsansicht.
-- Offene Frage: Welche Statusdetails brauchen wir zwingend im JSON-Modus?
+### Round 3: Status
 
-### Runde 4: Teardown
+- Expectation: Status provides a compact, stakeholder-friendly view of team health.
+- Observation: Each role is visible with runtime state and baseline checks.
+- Insight: The health view works as the primary operational dashboard.
+- Open question: Which status fields are mandatory in JSON output?
 
-- Erwartung: Einzelne Mitarbeiter oder ganze Teams lassen sich kontrolliert entfernen.
-- Beobachtung: Teardown bleibt im Dry-Run risikofrei und wird erst mit `--execute` wirksam.
-- Erkenntnis: Das Entfernen ist ein normaler Lifecycle-Schritt und kein Sonderfall.
-- Offene Frage: Sollen wir Team-weiten Teardown immer mit zweiter Bestatigung absichern?
+### Round 4: Teardown
 
-## Sicherheits-Check je Runde
+- Expectation: Individual members or whole teams can be removed in a controlled way.
+- Observation: Teardown is safe by default in preview mode and only mutates with --execute.
+- Insight: Removal is a normal lifecycle operation, not an exceptional one.
+- Open question: Should team-wide teardown always require a second confirmation?
 
-- Risiko: ungewollte Host-Mutation
-- Impact: Instanz-Ausfall oder Konfigurationsdrift
-- Mitigation: Dry-Run als Default, explizites `--execute`, zusaetzlich gezielte Zielauswahl (`--member`)
+## Security Check Per Round
 
-- Risiko: zu breite Netzwerkfreigabe (z. B. `0.0.0.0`)
-- Impact: unerwuenschte Erreichbarkeit von Mitarbeiter-Instanzen
-- Mitigation: bind_address bewusst waehlen, fuer interne Rollen `127.0.0.1` bevorzugen
+- Risk: Unintended host mutation
+- Impact: Instance outage or configuration drift
+- Mitigation: Dry-run by default, explicit --execute, and targeted scope with --member
 
-- Risiko: zu breite Schreib-Mounts in den Container
-- Impact: Manipulation von Workspace/State auf dem Host
-- Mitigation: Mounts auf noetige Pfade begrenzen, read-only wo praktikabel
+- Risk: Over-broad network exposure, for example 0.0.0.0
+- Impact: Unwanted external reachability of team member instances
+- Mitigation: Choose bind_address deliberately, prefer 127.0.0.1 for internal roles
 
-## Naechster Schritt
+- Risk: Over-broad write mounts into containers
+- Impact: Host workspace or state tampering
+- Mitigation: Restrict mounts to required paths, use read-only where practical
 
-Im naechsten Schritt erfassen wir echte Lauf-Erfahrungen fuer alle vier Lifecycle-Kommandos und leiten daraus konkrete CLI-Verbesserungen fuer Ausgabequalitaet, Selektorlogik und Guardrails ab.
+## Next Step
 
+Capture real runtime outcomes for all lifecycle commands and derive concrete CLI improvements for output quality, selector logic, and guardrails.
 
-## Nutzung der Mitarbeiter
+# Onboarding a New Team Member
 
+This section describes how to initialize a new OpenClaw team member and add it to an existing team.
+
+## 1. Provide a Model for the Team Member
+
+Each team member needs access to at least one language model.
+
+Connect to the target container:
+
+```bash
+podman exec -it <team-member-container-name> /bin/bash
+```
+
+### List Available Models
+
+```bash
+openclaw models list --all
+```
+
+### Authenticate a Model Provider
+
+If no provider is configured yet, authenticate one. Example for OpenAI:
+
+```bash
+openclaw models auth login --provider openai
+```
+
+Follow the interactive prompts. For native web search support, OpenClaw also recommends:
+
+```bash
+openclaw configure --section web
+```
+
+Recommended setting:
+
+```text
+Mode: cached
+```
+
+More information:
+
+https://docs.openclaw.ai/tools/web
+
+## 2. Define the Team Member Role
+
+Each team member receives its identity, responsibilities, and working style from a ROLE.md file.
+
+Role definitions are located under:
+
+```text
+/team-definition/
+```
+
+Examples:
+
+```text
+/team-definition/product_owner/ROLE.md
+/team-definition/developer/ROLE.md
+/team-definition/researcher/ROLE.md
+```
+
+A role definition should include:
+
+- Purpose and ownership scope
+- Working principles
+- Decision authority
+- Collaboration expectations with other team members
+
+## 3. Onboard the Team Member
+
+Start the OpenClaw TUI:
+
+```bash
+openclaw tui
+```
+
+At startup, the member is uninitialized and does not yet know its role.
+
+Example:
+
+```text
+>> wake up my friend
+
+Hey. I just came online.
+
+Who am I, friend?
+And who are you?
+```
+
+Then instruct it to load its role definition:
+
+```text
+Find your description in /team-definition/ROLE.md
+```
+
+The member reads the role definition and adopts the responsibilities defined there.
+
+## 4. Ready for Work
+
+After successful onboarding, the member knows:
+
+- its role
+- its responsibilities
+- its working style
+- its collaboration model with the rest of the team
+
+The member is now operational and ready to execute role-specific tasks.
