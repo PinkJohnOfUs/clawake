@@ -99,8 +99,6 @@ The current lifecycle is team/member oriented and built around Quadlet reconcili
 - `workspace_path`: mounted at `/workspace` for runtime work.
 - `team_definition_path`: mounted read-only at `/team-definition`.
 
-OpenClaw runtime state is written under `workspace_path/.openclaw`.
-
 For local CLI usage, set it once per shell:
 
 ```bash

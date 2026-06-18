@@ -34,20 +34,6 @@ instances:
     gateway_runtime:
       enabled: true
       bind: lan
-    auto_onboard:
-      required_env:
-        - OPENCLAW_GATEWAY_BIND
-        - OPENCLAW_GATEWAY_TOKEN
-      openclaw_config:
-        gateway:
-          mode: "$ENV:OPENCLAW_GATEWAY_BIND"
-          auth:
-            token: "$ENV:OPENCLAW_GATEWAY_TOKEN"
-        channels:
-          discord:
-            token: "$ENV?:DISCORD_BOT_TOKEN"
-            server_id: "$ENV?:DISCORD_SERVER_ID"
-            channel_id: "$ENV?:DISCORD_CHANNEL_ID"
     backup_policy:
       enabled: true
       pre_mutation: true
@@ -87,15 +73,6 @@ instances:
     gateway_runtime:
       enabled: true
       bind: lan
-    auto_onboard:
-      required_env:
-        - OPENCLAW_GATEWAY_BIND
-        - OPENCLAW_GATEWAY_TOKEN
-      openclaw_config:
-        gateway:
-          mode: "$ENV:OPENCLAW_GATEWAY_BIND"
-          auth:
-            token: "$ENV:OPENCLAW_GATEWAY_TOKEN"
     backup_policy:
       enabled: true
       pre_mutation: true

@@ -4,7 +4,7 @@ import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -77,12 +77,6 @@ class DashboardMeta(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
-class AutoOnboardSpec(BaseModel):
-    enabled: bool = True
-    openclaw_config: dict[str, Any] = Field(default_factory=dict)
-    required_env: list[str] = Field(default_factory=list)
-
-
 class InstanceSpec(BaseModel):
     name: str
     host: str
@@ -102,7 +96,6 @@ class InstanceSpec(BaseModel):
     update_policy: UpdatePolicy = Field(default_factory=UpdatePolicy)
     backup_policy: BackupPolicy = Field(default_factory=BackupPolicy)
     gateway_runtime: GatewayRuntimeSpec = Field(default_factory=GatewayRuntimeSpec)
-    auto_onboard: AutoOnboardSpec | None = None
     dashboard: DashboardMeta
 
     @model_validator(mode="after")

@@ -10,7 +10,6 @@ def test_load_example_inventory() -> None:
     assert inventory.cluster.mode == "single_host"
     assert len(inventory.instances) == 2
     assert {instance.role for instance in inventory.instances} == {"product_owner", "developer"}
-    assert all(instance.auto_onboard is not None for instance in inventory.instances)
     for instance in inventory.instances:
         assert instance.workspace_path.endswith("/workspace")
         assert instance.team_definition_path.endswith("/role")

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import shutil
 from pathlib import Path
@@ -11,14 +10,7 @@ from typing import Annotated, Literal
 import typer
 
 from clawake.config import InstanceSpec, Inventory, load_inventory
-from clawake.services.onboarding import (
-    AutoOnboardError,
-    AutoOnboardPlan,
-    auto_onboard_would_change,
-    build_auto_onboard_plan,
-    write_auto_onboard_config,
-)
-from clawake.services.render import image_ref, render_instance_assets
+from clawake.services.render import render_instance_assets
 from clawake.services.systemd import CommandResult, SystemdService
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -91,151 +83,6 @@ def _diagnostic_summary(result: CommandResult | None) -> str | None:
         if stripped:
             return stripped
     return None
-
-
-def _prepare_runtime_mounts(instance: InstanceSpec, execute: bool) -> list[str]:
-    actions: list[str] = []
-
-    workspace_path = Path(instance.workspace_path).expanduser()
-    team_definition_path = Path(instance.team_definition_path).expanduser()
-    runtime_dir = workspace_path / ".openclaw"
-    state_file = runtime_dir / "openclaw.json"
-
-    if not workspace_path.exists() or not workspace_path.is_dir():
-        raise typer.BadParameter(
-            f"Workspace path missing or not a directory for '{instance.name}': {workspace_path}"
-        )
-
-    if not team_definition_path.exists():
-        raise typer.BadParameter(
-            f"Team definition path missing for '{instance.name}': {team_definition_path}"
-        )
-
-    for directory in (runtime_dir,):
-        if directory.exists() and not directory.is_dir():
-            raise typer.BadParameter(
-                f"Runtime path is not a directory for '{instance.name}': {directory}"
-            )
-        if not directory.exists():
-            if execute:
-                directory.mkdir(parents=True, exist_ok=True)
-                actions.append(f"Prepared runtime directory for {instance.name}: {directory}")
-            else:
-                actions.append(f"DRY RUN prepare runtime directory for {instance.name}: {directory}")
-
-    if state_file.exists() and not state_file.is_file():
-        raise typer.BadParameter(
-            f"Runtime state path is not a regular file for '{instance.name}': {state_file}"
-        )
-
-    if not state_file.exists():
-        if execute:
-            state_file.write_text("{}\n", encoding="utf-8")
-            actions.append(f"Prepared runtime state file for {instance.name}: {state_file}")
-        else:
-            actions.append(f"DRY RUN prepare runtime state file for {instance.name}: {state_file}")
-
-    return actions
-
-
-def _config_contains_required_shape(actual: object, expected: object) -> bool:
-    if isinstance(expected, dict):
-        if not isinstance(actual, dict):
-            return False
-        for key, child in expected.items():
-            if key not in actual:
-                return False
-            if not _config_contains_required_shape(actual[key], child):
-                return False
-        return True
-    if isinstance(expected, list):
-        if not isinstance(actual, list):
-            return False
-        if len(actual) < len(expected):
-            return False
-        for index, child in enumerate(expected):
-            if not _config_contains_required_shape(actual[index], child):
-                return False
-        return True
-    return actual == expected
-
-
-def _auto_onboard_needs_repair(instance: InstanceSpec, plan: AutoOnboardPlan) -> bool:
-    if not instance.auto_onboard or not instance.auto_onboard.enabled:
-        return False
-    return auto_onboard_would_change(plan)
-
-
-def _repair_runtime_state_file(instance: InstanceSpec, execute: bool) -> list[str]:
-    actions: list[str] = []
-    state_dir = Path(instance.workspace_path).expanduser() / ".openclaw"
-    state_file = state_dir / "openclaw.json"
-
-    if state_file.exists() and not state_file.is_file():
-        raise typer.BadParameter(
-            f"Runtime state path is not a regular file for '{instance.name}': {state_file}"
-        )
-
-    for stale_candidate in sorted(state_dir.glob("openclaw.json.unreadable*")):
-        if execute:
-            stale_candidate.unlink(missing_ok=True)
-            actions.append(
-                f"Removed stale runtime state artifact for {instance.name}: {stale_candidate}"
-            )
-        else:
-            actions.append(
-                f"DRY RUN remove stale runtime state artifact for {instance.name}: {stale_candidate}"
-            )
-
-    if not state_file.exists():
-        return actions
-
-    current_uid = os.getuid()
-    current_gid = os.getgid()
-    stat_result = state_file.stat()
-    needs_repair = False
-    reasons: list[str] = []
-
-    if stat_result.st_uid != current_uid or stat_result.st_gid != current_gid:
-        needs_repair = True
-        reasons.append(
-            f"owner {stat_result.st_uid}:{stat_result.st_gid} != {current_uid}:{current_gid}"
-        )
-
-    payload = "{}\n"
-    read_error: OSError | None = None
-    try:
-        payload = state_file.read_text(encoding="utf-8")
-    except OSError as exc:
-        needs_repair = True
-        read_error = exc
-        reasons.append(f"unreadable ({exc})")
-
-    if not needs_repair:
-        return actions
-
-    reason_text = ", ".join(reasons)
-    if not execute:
-        actions.append(
-            f"DRY RUN repair runtime state file for {instance.name}: {state_file} ({reason_text})"
-        )
-        return actions
-
-    temp_state_file = state_file.with_name(f".{state_file.name}.clawake-repair")
-    temp_state_file.write_text(payload, encoding="utf-8")
-    temp_state_file.chmod(0o600)
-    temp_state_file.replace(state_file)
-    if read_error is not None:
-        actions.append(
-            f"Repaired runtime state file for {instance.name}: {state_file} "
-            f"(fallback payload due to read error: {read_error})"
-        )
-    else:
-        actions.append(
-            f"Repaired runtime state file for {instance.name}: {state_file} ({reason_text})"
-        )
-
-    return actions
 
 
 def _is_tolerated_teardown_error(result: CommandResult) -> bool:
@@ -382,72 +229,26 @@ def setup_quadlets(
     for instance, rendered_file, destination in changed_artifacts:
         typer.echo(f" - {instance.name} [{instance.role}] {rendered_file} -> {destination}")
 
-    auto_onboard_repairs: list[tuple[InstanceSpec, AutoOnboardPlan]] = []
-    for instance in selected:
-        if not instance.auto_onboard or not instance.auto_onboard.enabled:
-            continue
-        try:
-            plan = build_auto_onboard_plan(instance)
-        except AutoOnboardError as exc:
-            raise typer.BadParameter(str(exc)) from exc
-
-        if plan.missing_required_env:
-            missing = ", ".join(plan.missing_required_env)
-            raise typer.BadParameter(
-                f"Missing required environment variables for auto-onboard member '{instance.name}': {missing}"
-            )
-
-        if _auto_onboard_needs_repair(instance, plan):
-            auto_onboard_repairs.append((instance, plan))
-
     if not execute:
-        for instance in selected:
-            if instance.name not in changed_instance_names:
-                continue
-            for action in _prepare_runtime_mounts(instance, execute=False):
-                typer.echo(action)
-            for action in _repair_runtime_state_file(instance, execute=False):
-                typer.echo(action)
-        for instance, plan in auto_onboard_repairs:
-            typer.echo(
-                f"DRY RUN auto-onboard would write runtime config for {instance.name}: {plan.target_path}"
-            )
         typer.echo("DRY RUN setup-quadlets complete. Re-run with --execute to mutate state.")
         return
 
     service = SystemdService()
     failed = False
     restart_targets: list[str] = []
-    prepared_instances: set[str] = set()
 
     for instance, rendered_file, destination in changed_artifacts:
-        if instance.name not in prepared_instances:
-            for action in _prepare_runtime_mounts(instance, execute=True):
-                typer.echo(action)
-            for action in _repair_runtime_state_file(instance, execute=True):
-                typer.echo(action)
-            prepared_instances.add(instance.name)
-
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(rendered_file, destination)
         typer.echo(f"Deployed {rendered_file} -> {destination}")
         if instance.name not in restart_targets:
             restart_targets.append(instance.name)
 
-    if auto_onboard_repairs:
-        for instance, plan in auto_onboard_repairs:
-            write_auto_onboard_config(plan, execute=True)
-            typer.echo(
-                f"Auto-onboard repaired runtime config for {instance.name}: {plan.target_path}"
-            )
-            if instance.name not in restart_targets:
-                restart_targets.append(instance.name)
-
     reload_result = service.daemon_reload(execute=True)
     _print_result(reload_result)
     failed = failed or reload_result.return_code != 0
 
-    if not changed_artifacts and not auto_onboard_repairs:
+    if not changed_artifacts:
         typer.echo("No rendered changes detected; daemon-reload completed.")
 
     for instance_name in restart_targets:

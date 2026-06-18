@@ -6,7 +6,7 @@
 
 - Enable users to create and manage complete OpenClaw teams within minutes.
 - Provide an intuitive CLI focused on user intent rather than infrastructure details.
-- Hide the complexity of OpenClaw configuration and deployment.
+- Hide the complexity of Quadlet deployment and lifecycle management.
 - Offer sensible defaults while allowing customization where it matters.
 - Reduce the learning curve for new OpenClaw users.
 
@@ -33,7 +33,7 @@
 - Manage OpenClaw instances as systemd Quadlets.
 - Automatically generate and maintain Quadlet definitions.
 - Shield users from container runtime and systemd implementation details.
-- Use the OpenClaw CLI internally without exposing its complexity.
+- Keep OpenClaw runtime configuration ownership inside OpenClaw itself.
 
 ### Instance Lifecycle Management
 
@@ -64,7 +64,7 @@ Additional lifecycle operations should remain consistent with the same user-focu
 
 The tool should be the easiest way to build, deploy, and manage OpenClaw teams.
 
-Users describe their desired team in a single staff inventory file and interact with it through a small set of intuitive commands. The tool handles OpenClaw configuration, systemd Quadlets, container lifecycle management, and operational complexity behind the scenes.
+Users describe their desired team in a single staff inventory file and interact with it through a small set of intuitive commands. The tool handles systemd Quadlets, container lifecycle management, and operational complexity behind the scenes.
 
 
 ## Layers
@@ -94,8 +94,8 @@ Users describe their desired team in a single staff inventory file and interact 
 
 - `workspace_path` is host-owned runtime workspace mounted at `/workspace`.
 - `team_definition_path` is mounted read-only at `/team-definition` for role/team inputs.
-- Runtime-mutated OpenClaw data is persisted under `workspace_path/.openclaw`.
-- This keeps the runtime contract simple while preserving a dedicated read-only team definition mount.
+- Runtime-mutated OpenClaw data remains owned by OpenClaw itself.
+- This keeps Clawake focused on deployment orchestration while preserving a dedicated read-only team definition mount.
 
 ## Security guardrails (Phase 1)
 
@@ -118,7 +118,7 @@ Users describe their desired team in a single staff inventory file and interact 
 
 ## Current MVP workflows
 
-- `setup-quadlets` previews by default and applies with `--execute`; it renders, deploys, and reconciles member runtime prerequisites.
+- `setup-quadlets` previews by default and applies with `--execute`; it renders and deploys member Quadlet artifacts.
 - `restart-quadlets` restarts selected or all managed services after config/image changes.
 - `teardown-quadlets` removes managed runtime services for selected members or whole teams.
 - `status-quadlets` aggregates per-member runtime status with optional machine-readable output.
