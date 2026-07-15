@@ -36,7 +36,7 @@ jobs:
       - name: Tests
         run: pytest -q
 
-      - name: Validate + render examples
+      - name: CLI contract checks
         run: |
-          clawake validate -c examples/staff/team.yml
-          clawake render -c examples/staff/team.yml -o /tmp/render-product
+          clawake diagnose-dashboard -c examples/staff/team.yml --format json
+          clawake setup-quadlets -c examples/staff/team.yml
