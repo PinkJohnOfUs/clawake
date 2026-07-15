@@ -15,8 +15,8 @@ instances:
     quadlet_path: excalibot-product-owner.container
     container_name: excalibot-product-owner
     image:
-      repository: ghcr.io/openclaw/openclaw
-      tag: "2026.6.5"
+      repository: ghcr.io/openclaw/openclaw-staff
+      tag: "2026.6.11-tools"
     ports:
       - bind_address: 127.0.0.1
         host_port: 18789
@@ -52,10 +52,8 @@ instances:
     quadlet_path: excalibot-developer.container
     container_name: excalibot-developer
     image:
-      repository: ghcr.io/openclaw/openclaw
-      tag: "2026.6.1"
-      digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
-      known_good_digest: sha256:b12f76a7947e4cdd328bf3ea1045d41a5494b33852c911e9bc4fdd03dde469d5
+      repository: ghcr.io/openclaw/openclaw-staff
+      tag: "2026.6.11-tools"
     ports:
       - bind_address: 127.0.0.1
         host_port: 9011
