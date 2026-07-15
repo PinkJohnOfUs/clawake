@@ -29,10 +29,7 @@ def _classify_stderr(stderr: str) -> str:
         return (
             "Check that the image tag and digest are correct and the image exists in the registry."
         )
-    if any(
-        marker in lower
-        for marker in ("unauthorized", "access denied", "forbidden", "403")
-    ):
+    if any(marker in lower for marker in ("unauthorized", "access denied", "forbidden", "403")):
         return (
             "The registry refused access to this image reference. "
             "OpenClaw images are public and do not require podman login; "
@@ -51,8 +48,7 @@ def _classify_stderr(stderr: str) -> str:
         or "i/o timeout" in lower
     ):
         return (
-            "Network error. Check connectivity to the registry and any "
-            "proxy or firewall settings."
+            "Network error. Check connectivity to the registry and any proxy or firewall settings."
         )
     if "digest" in lower and ("mismatch" in lower or "invalid" in lower):
         return (

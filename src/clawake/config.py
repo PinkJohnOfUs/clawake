@@ -265,10 +265,7 @@ def _expand_string_values(value: object, env: Mapping[str, str]) -> object:
     if isinstance(value, list):
         return [_expand_string_values(item, env) for item in value]
     if isinstance(value, dict):
-        return {
-            key: _expand_string_values(item, env)
-            for key, item in value.items()
-        }
+        return {key: _expand_string_values(item, env) for key, item in value.items()}
     return value
 
 
@@ -280,9 +277,7 @@ def load_inventory(path: str | Path) -> Inventory:
 
     resolved_path = inventory_path.resolve()
     workspace_root = (
-        resolved_path.parents[2]
-        if len(resolved_path.parents) >= 3
-        else resolved_path.parent
+        resolved_path.parents[2] if len(resolved_path.parents) >= 3 else resolved_path.parent
     )
     expansion_env = {
         **os.environ,

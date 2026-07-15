@@ -66,8 +66,7 @@ def _status_needs_diagnostics(result: CommandResult) -> bool:
     if result.return_code != 0:
         return True
     return any(
-        token in details
-        for token in ("inactive (dead)", "failed", "activating (auto-restart)")
+        token in details for token in ("inactive (dead)", "failed", "activating (auto-restart)")
     )
 
 
@@ -320,7 +319,9 @@ def status_quadlets(
             "diagnostics": (
                 diagnostics.stdout
                 if diagnostics and diagnostics.stdout
-                else diagnostics.stderr if diagnostics else ""
+                else diagnostics.stderr
+                if diagnostics
+                else ""
             ),
         }
         rows.append(row)
@@ -340,8 +341,7 @@ def status_quadlets(
         typer.echo(f"Cluster: {inventory.cluster.name} ({inventory.cluster.mode})")
         for row in rows:
             typer.echo(
-                f"- {row['instance']} [{row['role']}] "
-                f"state={row['state']} rc={row['return_code']}"
+                f"- {row['instance']} [{row['role']}] state={row['state']} rc={row['return_code']}"
             )
             diagnostics_summary = _diagnostic_summary(
                 CommandResult(command=[], return_code=0, stdout=str(row["diagnostics"]), stderr="")

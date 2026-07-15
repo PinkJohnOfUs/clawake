@@ -51,8 +51,6 @@ def test_render_inventory_writes_all_quadlet_artifacts(tmp_path: Path) -> None:
     )
 
     expected = {
-        path
-        for instance in inventory.instances
-        for path in instance.quadlet_artifact_paths
+        path for instance in inventory.instances for path in instance.quadlet_artifact_paths
     }
     assert expected == {str(path.relative_to(tmp_path)) for path in rendered_paths}
