@@ -16,7 +16,7 @@ Use this directory for real host/instance staff files used by operations.
 
 Use the Make targets from `make/staff-image.mk` (included by the root `Makefile`) to build the custom staff image and prepare the image block for `examples/staff/team.yml`.
 
-The `staff/Dockerfile` is designed as an **SBOM-ready standalone base image** with:
+The `/examples/staff/Dockerfile` is designed as an **SBOM-ready standalone base image** with:
 - **No workspace dependencies** - pure base image with tools
 - **SBOM manifest** at `/etc/staff-image-sbom.env` with exact versions captured at build time
 - **OCI image labels** for component tracking via `podman inspect`
