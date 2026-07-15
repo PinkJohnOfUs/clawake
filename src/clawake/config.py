@@ -141,7 +141,10 @@ class Inventory(BaseModel):
     def validate_inventory(self) -> Inventory:
         def _expand_path(raw_path: str) -> str:
             expanded = os.path.expandvars(raw_path)
-            expanded = expanded.replace("${workspaceFolder}", os.environ.get("CLAWAKE_WORKSPACE_ROOT", ""))
+            expanded = expanded.replace(
+                "${workspaceFolder}",
+                os.environ.get("CLAWAKE_WORKSPACE_ROOT", ""),
+            )
             return str(Path(expanded).expanduser())
 
         def _validate_safe_absolute_path(label: str, raw_path: str) -> str:
@@ -275,7 +278,12 @@ def load_inventory(path: str | Path) -> Inventory:
     if not isinstance(data, dict):
         raise ValueError("Inventory file must contain a YAML mapping")
 
-    workspace_root = inventory_path.resolve().parents[2] if len(inventory_path.resolve().parents) >= 3 else inventory_path.resolve().parent
+    resolved_path = inventory_path.resolve()
+    workspace_root = (
+        resolved_path.parents[2]
+        if len(resolved_path.parents) >= 3
+        else resolved_path.parent
+    )
     expansion_env = {
         **os.environ,
         "workspaceFolder": os.environ.get("CLAWAKE_WORKSPACE_ROOT", str(workspace_root)),

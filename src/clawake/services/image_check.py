@@ -29,12 +29,18 @@ def _classify_stderr(stderr: str) -> str:
         return (
             "Check that the image tag and digest are correct and the image exists in the registry."
         )
-    if "unauthorized" in lower or "access denied" in lower or "forbidden" in lower or "403" in lower:
+    if any(
+        marker in lower
+        for marker in ("unauthorized", "access denied", "forbidden", "403")
+    ):
         return (
-            "The registry refused access to this image reference. OpenClaw images are public and do not require "
-            "podman login; verify the repository, tag, and digest, and confirm that the image is actually published "
-            "in ghcr.io. The OpenClaw container images can be found here: "
-            "https://github.com/openclaw/openclaw/pkgs/container/openclaw. If you intentionally changed the reference "
+            "The registry refused access to this image reference. "
+            "OpenClaw images are public and do not require podman login; "
+            "verify the repository, tag, and digest, and confirm that "
+            "the image is actually published in ghcr.io. The OpenClaw "
+            "container images can be found here: "
+            "https://github.com/openclaw/openclaw/pkgs/container/openclaw. "
+            "If you intentionally changed the reference "
             "to a non-existent image, this error is expected."
         )
     if (
@@ -44,7 +50,10 @@ def _classify_stderr(stderr: str) -> str:
         or "dial tcp" in lower
         or "i/o timeout" in lower
     ):
-        return "Network error. Check connectivity to the registry and any proxy or firewall settings."
+        return (
+            "Network error. Check connectivity to the registry and any "
+            "proxy or firewall settings."
+        )
     if "digest" in lower and ("mismatch" in lower or "invalid" in lower):
         return (
             "The image digest in the config does not match the registry. "

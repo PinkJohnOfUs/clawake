@@ -7,7 +7,6 @@ from pathlib import Path
 
 from clawake.config import InstanceSpec
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -92,7 +91,9 @@ def backup_instance(instance: InstanceSpec, output_dir: Path, execute: bool = Fa
                     archive,
                     source,
                     arcname=f"{idx:02d}__{mount_identifier}",
-                    skip_legacy_workspace_runtime=(source == Path(instance.workspace_path).expanduser()),
+                    skip_legacy_workspace_runtime=(
+                        source == Path(instance.workspace_path).expanduser()
+                    ),
                 )
 
     return archive_path

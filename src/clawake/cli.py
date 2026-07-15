@@ -65,7 +65,10 @@ def _status_needs_diagnostics(result: CommandResult) -> bool:
     details = "\n".join(part for part in (result.stdout, result.stderr) if part).lower()
     if result.return_code != 0:
         return True
-    return any(token in details for token in ("inactive (dead)", "failed", "activating (auto-restart)"))
+    return any(
+        token in details
+        for token in ("inactive (dead)", "failed", "activating (auto-restart)")
+    )
 
 
 def _status_diagnostics(service: SystemdService, instance_name: str) -> CommandResult | None:
@@ -314,7 +317,11 @@ def status_quadlets(
             "unit": service.unit_name(instance.name),
             "stdout": result.stdout,
             "stderr": result.stderr,
-            "diagnostics": diagnostics.stdout if diagnostics and diagnostics.stdout else diagnostics.stderr if diagnostics else "",
+            "diagnostics": (
+                diagnostics.stdout
+                if diagnostics and diagnostics.stdout
+                else diagnostics.stderr if diagnostics else ""
+            ),
         }
         rows.append(row)
 

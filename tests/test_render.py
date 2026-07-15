@@ -1,10 +1,12 @@
 from pathlib import Path
 
 from clawake.config import load_inventory
-from clawake.services.render import image_ref
-from clawake.services.render import render_inventory
-from clawake.services.render import render_instance_assets
-from clawake.services.render import render_instance
+from clawake.services.render import (
+    image_ref,
+    render_instance,
+    render_instance_assets,
+    render_inventory,
+)
 
 
 def test_render_contains_expected_container_data() -> None:
@@ -42,7 +44,11 @@ def test_render_assets_include_container_network_and_volume() -> None:
 
 def test_render_inventory_writes_all_quadlet_artifacts(tmp_path: Path) -> None:
     inventory = load_inventory(Path("examples/staff/team.yml"))
-    rendered_paths = render_inventory(inventory, output_dir=tmp_path, template_root=Path("templates"))
+    rendered_paths = render_inventory(
+        inventory,
+        output_dir=tmp_path,
+        template_root=Path("templates"),
+    )
 
     expected = {
         path

@@ -41,7 +41,9 @@ def test_check_image_availability_strict_digest_tag_match(monkeypatch: pytest.Mo
     ]
 
 
-def test_check_image_availability_strict_digest_tag_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_check_image_availability_strict_digest_tag_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     image = ImageSpec(
         repository="ghcr.io/openclaw/openclaw",
         tag="2026.6.5",

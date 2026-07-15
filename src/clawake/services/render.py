@@ -47,7 +47,8 @@ def render_inventory(inventory: Inventory, output_dir: Path, template_root: Path
     output_dir.mkdir(parents=True, exist_ok=True)
     rendered_paths: list[Path] = []
     for instance in inventory.instances:
-        for relative_path, content in render_instance_assets(instance, template_root=template_root).items():
+        assets = render_instance_assets(instance, template_root=template_root)
+        for relative_path, content in assets.items():
             target = output_dir / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")

@@ -134,7 +134,12 @@ def test_setup_quadlets_execute_deploys_files(monkeypatch: object, tmp_path: Pat
 
         def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
             RecordingSystemdService.restart_calls += 1
-            return CommandResult(["systemctl", "--user", "restart", f"{instance_name}.service"], 0, "ok", "")
+            return CommandResult(
+                ["systemctl", "--user", "restart", f"{instance_name}.service"],
+                0,
+                "ok",
+                "",
+            )
 
     quadlet_root = tmp_path / "quadlets"
     cfg, _env_file, _workspace = _write_inventory(tmp_path, quadlet_root=quadlet_root)
@@ -155,7 +160,12 @@ def test_restart_quadlets_execute_propagates_failures(monkeypatch: object, tmp_p
 
     class FailingSystemdService:
         def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
-            return CommandResult(["systemctl", "--user", "restart", f"{instance_name}.service"], 1, "", "failed")
+            return CommandResult(
+                ["systemctl", "--user", "restart", f"{instance_name}.service"],
+                1,
+                "",
+                "failed",
+            )
 
     cfg, _env_file, _workspace = _write_inventory(tmp_path)
     monkeypatch.setattr(cli, "SystemdService", FailingSystemdService)
@@ -170,9 +180,16 @@ def test_status_quadlets_json_healthy(monkeypatch: object, tmp_path: Path) -> No
 
     class HealthySystemdService:
         def status(self, instance_name: str, execute: bool = False) -> CommandResult:
-            return CommandResult(["systemctl", "--user", "status", f"{instance_name}.service"], 0, "active", "")
+            return CommandResult(
+                ["systemctl", "--user", "status", f"{instance_name}.service"],
+                0,
+                "active",
+                "",
+            )
 
-        def logs(self, instance_name: str, lines: int = 100, execute: bool = False) -> CommandResult:
+        def logs(
+            self, instance_name: str, lines: int = 100, execute: bool = False
+        ) -> CommandResult:
             return CommandResult(["journalctl"], 0, "", "")
 
         def unit_name(self, instance_name: str) -> str:
@@ -201,7 +218,9 @@ def test_status_quadlets_text_prints_diagnostic_cause(monkeypatch: object, tmp_p
                 "",
             )
 
-        def logs(self, instance_name: str, lines: int = 100, execute: bool = False) -> CommandResult:
+        def logs(
+            self, instance_name: str, lines: int = 100, execute: bool = False
+        ) -> CommandResult:
             return CommandResult(["journalctl"], 0, "EnvironmentFile missing", "")
 
         def unit_name(self, instance_name: str) -> str:
