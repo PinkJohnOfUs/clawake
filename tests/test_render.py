@@ -22,7 +22,11 @@ def test_render_contains_expected_container_data() -> None:
     assert f"Volume={instance.team_definition_path}:/team-definition:ro" in rendered
     assert f"Volume={instance.workspace_path}/.openclaw:/home/node/.openclaw" in rendered
     assert f"Network={instance.network_quadlet_path}" in rendered
-    assert "Exec=openclaw gateway run --bind loopback --port 18789" in rendered
+    assert (
+        "Exec=openclaw gateway run "
+        f"--bind {instance.gateway_runtime.bind} "
+        f"--port {instance.gateway_runtime.gateway_container_port}"
+    ) in rendered
 
 
 def test_render_assets_include_container_network_and_volume() -> None:

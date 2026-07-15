@@ -3,7 +3,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from clawake.services.upgrade import apply_upgrade, build_upgrade_plan, rollback_to_known_good
+from clawake.services.upgrade import (
+    apply_upgrade,
+    build_upgrade_plan,
+    rollback_to_known_good,
+)
+
+PRODUCT_OWNER_INSTANCE = "excalibot-product-owner"
 
 
 def _load_image(config: Path, instance_name: str) -> dict[str, str]:
@@ -16,10 +22,10 @@ def _load_image(config: Path, instance_name: str) -> dict[str, str]:
 
 def test_build_upgrade_plan() -> None:
     config = Path("examples/staff/team.yml")
-    image = _load_image(config, "openclaw-product-owner")
+    image = _load_image(config, PRODUCT_OWNER_INSTANCE)
     plan = build_upgrade_plan(
         config,
-        "openclaw-product-owner",
+        PRODUCT_OWNER_INSTANCE,
         next_tag="0.15.0",
         next_digest="sha256:abcd",
     )
@@ -32,18 +38,27 @@ def test_apply_upgrade_and_rollback(tmp_path: Path) -> None:
     src = Path("examples/staff/team.yml")
     config = tmp_path / "product.yml"
     config.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-    original_image = _load_image(config, "openclaw-product-owner")
+
+    # Keep this test independent from staff example defaults.
+    data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    for instance in data["instances"]:
+        if instance["name"] == PRODUCT_OWNER_INSTANCE:
+            instance["image"]["known_good_digest"] = "sha256:known-good"
+            break
+    config.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    original_image = _load_image(config, PRODUCT_OWNER_INSTANCE)
 
     applied = apply_upgrade(
         config,
-        "openclaw-product-owner",
+        PRODUCT_OWNER_INSTANCE,
         next_tag="0.15.0",
         next_digest="sha256:new",
     )
     assert applied.next_tag == "0.15.0"
     assert applied.next_digest == "sha256:new"
 
-    rolled = rollback_to_known_good(config, "openclaw-product-owner")
+    rolled = rollback_to_known_good(config, PRODUCT_OWNER_INSTANCE)
     assert rolled.previous_digest == "sha256:new"
     assert rolled.next_digest == original_image["known_good_digest"]
 
