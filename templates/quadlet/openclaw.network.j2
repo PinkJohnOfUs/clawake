@@ -1,0 +1,8 @@
+[Unit]
+Description=OpenClaw network {{ instance.name }}
+
+[Network]
+NetworkName={{ instance.container_name }}
+
+[Install]
+WantedBy=default.target

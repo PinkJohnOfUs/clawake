@@ -1,159 +1,144 @@
 # clawake
 
-The sewer system beneath the bowls on which the agents are sitting.
+The sewer system beneath the bowls on which the agents are sitting. Effectively the sandbox for the agents, designed to contain all waste and prevent the cat from shitting in your house.
 
 `clawake` is a Python-first operations toolkit for managing one or more OpenClaw deployments running in rootless Podman containers through Quadlet and systemd user services.
 
-## 1) Concise architectural recommendation
+Operational defaults:
+- Safe by default (`dry-run` first, explicit `--execute` for mutations).
+- Staff-driven configuration (`-c/--config` YAML file).
 
-- Keep **inventory files** in git as the source of truth (`inventory/` + `examples/inventory/`).
-- Put all operational logic in `src/clawake/services/`; keep CLI thin.
-- Default every workflow to **safe preview/dry-run**.
-- Require explicit `--execute` for mutation (deploy/restart/upgrade/rollback).
-- Keep a simple local-state approach first (files + tar backups), no DB yet.
-- Prepare dashboard by reusing the same services behind a future FastAPI web layer.
+## CLI Setup (uv + make)
 
-## 2) Proposed repository tree
+`pyproject.toml` already defines the console entry point `clawake = "clawake.cli:app"`.
+That means the project knows how to expose a `clawake` command, but the command is only directly available after you run it through `uv` or install it into your user environment.
 
-```text
-.
-├── .github/workflows/ci.yml
-├── docs/
-│   ├── architecture.md
-│   ├── repo-roadmap.md
-│   └── upgrade-playbook.md
-├── examples/inventory/
-│   ├── dev.yaml
-│   └── prod.yaml
-├── inventory/
-│   └── README.md
-├── templates/quadlet/
-│   └── openclaw.container.j2
-├── src/clawake/
-│   ├── __init__.py
-│   ├── cli.py
-│   ├── config.py
-│   └── services/
-│       ├── backup.py
-│       ├── render.py
-│       └── systemd.py
-├── tests/
-│   ├── test_cli.py
-│   ├── test_config.py
-│   └── test_render.py
-├── pyproject.toml
-├── LICENSE
-└── README.md
-```
-
-Why these top-level parts exist:
-- `docs/`: operator-facing architecture and runbooks.
-- `src/`: installable application code.
-- `tests/`: focused unit/CLI tests.
-- `examples/inventory/`: practical declarative examples.
-- `templates/`: Quadlet templates rendered from inventory.
-- `.github/workflows/`: CI checks for lint/test/render validation.
-
-## 3) Recommended Python stack
-
-- CLI: **Typer** (clear subcommands, good UX).
-- Config/schema validation: **Pydantic v2** + YAML loading.
-- Templating: **Jinja2** for Quadlet generation.
-- Testing: **pytest**.
-- Lint/format: **ruff**.
-- Logging: stdlib **logging**.
-- Packaging/deps: **pyproject.toml** with setuptools.
-- Dashboard-later path: **FastAPI + server-rendered Jinja templates** (not SPA-first).
-
-## 4) MVP CLI/workflow design
-
-Implemented CLI commands (safe by default):
-
-- `clawake validate -c <inventory.yaml>`
-- `clawake render -c <inventory.yaml> -o <render-dir>`
-- `clawake plan -c <inventory.yaml> -o <render-dir>` (preview/diff)
-- `clawake apply -c <inventory.yaml> --target <quadlet-dir> [--output <render-dir>] [--execute]`
-- `clawake deploy -c <inventory.yaml> --target <quadlet-dir> [--execute]`
-- `clawake restart <instance> [--execute]`
-- `clawake status <instance> [--execute]`
-- `clawake status-cluster -c <inventory.yaml> [--format text|json] [--execute]`
-- `clawake logs <instance> [--lines N] [--execute]`
-- `clawake backup -c <inventory.yaml> -i <instance> -o <backup-dir> [--execute]`
-- `clawake upgrade -c <inventory.yaml> -i <instance> [--tag X] [--digest Y] [--execute]`
-- `clawake rollback -c <inventory.yaml> -i <instance> [--execute]`
-
-Commands that mutate host state are dry-run unless `--execute` is set.
-
-## 5) Initial config/domain model
-
-Inventory models include:
-- cluster root for single-host mode (`cluster.name`, `cluster.mode=single_host`, `cluster.primary_host`)
-- instance name, host name, role, profile, service scope, quadlet path, container name
-- explicit per-instance `workspace_path`, `config_path`, `state_path`
-- image repository/tag/digest and known-good digest
-- ports/bind address, mounts, env files, labels
-- public URL, health expectations
-- update policy, backup policy
-- dashboard metadata/friendly labels
-
-See examples:
-- `examples/inventory/dev.yaml`
-- `examples/inventory/prod.yaml`
-
-## 6) Dashboard-readiness design
-
-- Core behavior lives in `services/*` and is UI-agnostic.
-- CLI orchestrates service calls only.
-- Future dashboard can call same services from FastAPI routes.
-- `status-cluster --format json` provides a machine-readable status snapshot contract.
-- Suggested MVP dashboard features for non-developers:
-  - list instances and friendly labels
-  - health + status summary
-  - current vs target image info
-  - pending rendered changes
-  - safe workflow triggers with confirmation prompts
-  - human-readable warnings/errors
-
-## 7) Key bootstrap files included
-
-This scaffold includes:
-- README + docs runbooks
-- installable Python package + starter CLI
-- domain/config models + rendering/systemd/backup/upgrade services
-- example inventory + Quadlet template
-- tests and CI workflow
-
-License recommendation: **MIT** (already included in `LICENSE`) because this is an operations tool likely to benefit from broad reuse with low legal friction.
-
-## 8) Open questions
-
-- Should source-of-truth remain a single YAML inventory or split per-host/per-instance files?
-- Local-only execution first, or early remote-over-SSH support?
-- Secrets model (`.env` files, sops, external secret manager)?
-- How should deployed state/known-good snapshots be tracked over time?
-- Should dashboard actions run locally, remotely over SSH, or through an on-host agent?
-- At what scale does adding a database become justified?
-
-## Next 10 tasks
-
-- [ ] Add `upgrade` and `rollback` command implementations.
-- [ ] Add host-specific override merge behavior.
-- [ ] Add preflight networking collision detection against live host state.
-- [ ] Add explicit digest pinning policy checks.
-- [ ] Add backup retention cleanup workflow.
-- [ ] Add deployment state snapshot file format.
-- [ ] Add structured JSON output mode for CLI.
-- [ ] Add FastAPI read-only dashboard prototype.
-- [ ] Add role-based controls for mutating actions.
-- [ ] Add remote SSH execution adapter.
-
-## Development
-
-This repository uses `uv` for dependency management and local tooling.
+Preferred for contributors (repo-local and reproducible):
 
 ```bash
-uv sync --dev
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest -q
+make install-dev
+make doctor
+make setup-quadlets
+make status-quadlets
 ```
+
+This uses `uv run clawake ...` against the project environment and avoids global drift.
+
+Optional user-level installation (global command on your machine):
+
+```bash
+make install-tool
+clawake --help
+```
+
+Remove user-level installation:
+
+```bash
+make uninstall-tool
+```
+
+Useful overrides:
+
+```bash
+make setup-quadlets CONFIG=examples/staff/team.yml
+make setup-quadlets MEMBER=product-owner
+make status-quadlets-json CONFIG=examples/staff/team.yml
+```
+
+## New Workflow (Phase 1 MVP)
+
+The current lifecycle is team/member oriented and built around Quadlet reconciliation.
+
+1. Prepare environment and dependencies:
+
+	```bash
+	export CLAWAKE_WORKSPACE_ROOT="$PWD"
+	make install-dev
+	```
+
+2. Preview changes (safe dry-run):
+
+	```bash
+	make setup-quadlets CONFIG=examples/staff/team.yml
+	```
+
+3. Apply changes (mutating):
+
+	```bash
+	make setup-quadlets-exec CONFIG=examples/staff/team.yml
+	```
+
+4. Check runtime health:
+
+	```bash
+	make status-quadlets CONFIG=examples/staff/team.yml
+	```
+
+5. Restart after config/image updates (optional):
+
+	```bash
+	make restart-quadlets-exec CONFIG=examples/staff/team.yml
+	```
+
+6. Teardown when needed:
+
+	```bash
+	make teardown-quadlets-exec CONFIG=examples/staff/team.yml
+	```
+
+## CLI Reference
+
+### Portable staff paths
+
+`examples/staff/team.yml` uses `${CLAWAKE_WORKSPACE_ROOT}` so paths stay portable across checkouts.
+
+### Simplified mount model
+
+`clawake` uses exactly two host paths per instance:
+
+- `workspace_path`: mounted at `/workspace` for runtime work.
+- `team_definition_path`: mounted read-only at `/team-definition`.
+
+For local CLI usage, set it once per shell:
+
+```bash
+export CLAWAKE_WORKSPACE_ROOT="$PWD"
+```
+
+In VS Code launch configurations, set `CLAWAKE_WORKSPACE_ROOT` to `${workspaceFolder}`.
+In CI, set `CLAWAKE_WORKSPACE_ROOT` to the repository workspace path.
+
+### Lifecycle commands
+
+- `clawake setup-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+- `clawake restart-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+- `clawake status-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--format text|json]`
+- `clawake teardown-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+
+### Makefile shortcuts
+
+- `make setup-quadlets`
+- `make setup-quadlets-exec`
+- `make restart-quadlets`
+- `make restart-quadlets-exec`
+- `make status-quadlets`
+- `make status-quadlets-json`
+- `make teardown-quadlets`
+- `make teardown-quadlets-exec`
+- `make test-lifecycle`
+
+### Parameter behavior
+
+- `--execute`: required for commands that mutate host state/config.
+- `--config/-c`: team inventory file (for example `examples/staff/team.yml`).
+- `--member/-m`: scope operation to one member instead of the whole team.
+- `--format`: output format for `status-quadlets` (`text` or `json`).
+
+## Documentation
+
+Please find general architecture, roadmap, and operational notes in `docs/`.
+
+- Architecture: `docs/architecture.md`
+- Roadmap: `docs/repo-roadmap.md`
+- Upgrade runbook: `docs/upgrade-playbook.md`
+- Project overview: `docs/project-overview.md`

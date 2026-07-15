@@ -6,21 +6,25 @@ Wants=network-online.target
 [Container]
 ContainerName={{ instance.container_name }}
 Image={{ image_ref }}
+UserNS=keep-id:uid=1000,gid=1000
 {% for env_file in instance.env_files %}
 EnvironmentFile={{ env_file }}
 {% endfor %}
 Volume={{ instance.workspace_path }}:/workspace
-Volume={{ instance.config_path }}:/app/config
-Volume={{ instance.state_path }}:/state
+Volume={{ instance.team_definition_path }}:/team-definition:ro
+Volume={{ instance.workspace_path }}/.openclaw:/home/node/.openclaw
+Network={{ instance.network_quadlet_path }}
 {% for mount in instance.mounts %}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
 {% endfor %}
 {% for port in instance.ports %}
 PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
 {% endfor %}
+{% if instance.gateway_runtime.enabled %}
+Exec=openclaw gateway run --bind {{ instance.gateway_runtime.bind }} --port {{ instance.gateway_runtime.gateway_container_port }}
+{% endif %}
 Label=clawake.instance={{ instance.name }}
 Label=clawake.role={{ instance.role }}
-Label=clawake.profile={{ instance.profile }}
 {% for key, value in instance.labels.items() %}
 Label={{ key }}={{ value }}
 {% endfor %}

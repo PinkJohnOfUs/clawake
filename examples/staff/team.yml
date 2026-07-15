@@ -1,0 +1,82 @@
+version: 1
+cluster:
+  name: single-host-mvp
+  mode: single_host
+  primary_host: solo-host
+hosts:
+  - name: solo-host
+    quadlet_root: ~/.config/containers/systemd
+instances:
+  - name: excalibot-product-owner
+    host: solo-host
+    role: product_owner
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner/workspace
+    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner/role
+    quadlet_path: excalibot-product-owner.container
+    container_name: excalibot-product-owner
+    image:
+      repository: ghcr.io/openclaw/openclaw-staff
+      tag: "2026.6.11-tools"
+    ports:
+      - bind_address: 127.0.0.1
+        host_port: 18789
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 127.0.0.1
+        host_port: 18790
+        container_port: 18790
+        protocol: tcp
+    env_files:
+      - ${CLAWAKE_WORKSPACE_ROOT}/examples/staff/env/product-owner.env
+    labels:
+      env: dev
+      audience: external
+    gateway_runtime:
+      enabled: true
+      bind: lan
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 5
+    dashboard:
+      friendly_name: Product Owner Instance
+      owner: Business Owner
+      description: External-facing Product Owner runtime
+      tags: [product_owner, public]
+
+  - name: excalibot-developer
+    host: solo-host
+    role: developer
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer/workspace
+    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer/role
+    quadlet_path: excalibot-developer.container
+    container_name: excalibot-developer
+    image:
+      repository: ghcr.io/openclaw/openclaw-staff
+      tag: "2026.6.11-tools"
+    ports:
+      - bind_address: 127.0.0.1
+        host_port: 9011
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 127.0.0.1
+        host_port: 9013
+        container_port: 18790
+        protocol: tcp
+    env_files:
+      - ${CLAWAKE_WORKSPACE_ROOT}/examples/staff/env/developer.env
+    labels:
+      env: dev
+      audience: internal
+    gateway_runtime:
+      enabled: true
+      bind: lan
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 5
+    dashboard:
+      friendly_name: Developer Instance
+      owner: Edge Team
+      description: Internal developer runtime
+      tags: [developer, internal]

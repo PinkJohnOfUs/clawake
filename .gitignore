@@ -220,3 +220,4 @@ __marimo__/
 # clawake generated artifacts
 .rendered/
 .backups/
+.clawake/

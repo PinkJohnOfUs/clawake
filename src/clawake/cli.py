@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import difflib
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Annotated, Literal
@@ -10,28 +10,20 @@ from typing import Annotated, Literal
 import typer
 
 from clawake.config import InstanceSpec, Inventory, load_inventory
-from clawake.services.backup import backup_instance
-from clawake.services.render import render_instance, render_inventory
+from clawake.services.render import render_instance_assets
 from clawake.services.systemd import CommandResult, SystemdService
-from clawake.services.upgrade import (
-    apply_upgrade,
-    backup_config,
-    build_upgrade_plan,
-    rollback_to_known_good,
-)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 app = typer.Typer(help="OpenClaw operations manager for rootless Podman + Quadlet")
 
 ConfigPath = Annotated[Path, typer.Option(..., "--config", "-c", exists=True, dir_okay=False)]
-OutputPath = Annotated[Path, typer.Option("--output", "-o")]
-TargetPath = Annotated[Path, typer.Option(..., "--target")]
+OptionalMemberName = Annotated[str | None, typer.Option("--member", "-m")]
 ExecuteFlag = Annotated[bool, typer.Option("--execute")]
-InstanceName = Annotated[str, typer.Option(..., "--instance", "-i")]
-TagValue = Annotated[str | None, typer.Option("--tag")]
-DigestValue = Annotated[str | None, typer.Option("--digest")]
 StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
+ShowTokenUrlFlag = Annotated[bool, typer.Option("--show-token-url")]
+
+_ENV_LINE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
 
 def _load(path: Path) -> Inventory:
@@ -46,7 +38,13 @@ def _instance_by_name(inventory: Inventory, name: str) -> InstanceSpec:
     for instance in inventory.instances:
         if instance.name == name:
             return instance
-    raise typer.BadParameter(f"Unknown instance '{name}'")
+    raise typer.BadParameter(f"Unknown member '{name}'")
+
+
+def _select_instances(inventory: Inventory, member: str | None) -> list[InstanceSpec]:
+    if member is None:
+        return list(inventory.instances)
+    return [_instance_by_name(inventory, member)]
 
 
 def _print_result(result: CommandResult) -> None:
@@ -57,183 +55,274 @@ def _print_result(result: CommandResult) -> None:
         typer.echo(result.stderr)
 
 
-def _status_state(result: CommandResult, execute: bool) -> str:
-    if not execute:
-        return "dry_run"
+def _status_state(result: CommandResult) -> str:
     if result.return_code == 0:
         return "healthy"
     return "failed"
 
 
-@app.command()
-def validate(config: ConfigPath) -> None:
-    """Validate inventory configuration."""
-    inventory = _load(config)
-    typer.echo(f"OK: {config} is valid for cluster '{inventory.cluster.name}'")
-
-
-@app.command()
-def render(config: ConfigPath, output: OutputPath = Path(".rendered")) -> None:
-    """Render Quadlet files from inventory."""
-    inventory = _load(config)
-    rendered = render_inventory(inventory, output_dir=output, template_root=_template_root())
-    typer.echo(f"Rendered {len(rendered)} file(s) into {output}")
-
-
-@app.command()
-def plan(config: ConfigPath, output: OutputPath = Path(".rendered")) -> None:
-    """Render and show file diffs against current output."""
-    inventory = _load(config)
-    output.mkdir(parents=True, exist_ok=True)
-    template_root = _template_root()
-    for instance in inventory.instances:
-        target = output / instance.quadlet_path
-        old = target.read_text(encoding="utf-8").splitlines() if target.exists() else []
-
-        new_text = render_instance(instance, template_root=template_root)
-        new = new_text.splitlines()
-        diff = list(
-            difflib.unified_diff(
-                old,
-                new,
-                fromfile="current",
-                tofile="rendered",
-                lineterm="",
-            )
-        )
-        if diff:
-            typer.echo(f"--- Plan for {instance.name} ({target}) ---")
-            typer.echo("\n".join(diff))
-        else:
-            typer.echo(f"No changes for {instance.name}")
-
-
-@app.command()
-def deploy(config: ConfigPath, target: TargetPath, execute: ExecuteFlag = False) -> None:
-    """Deploy rendered Quadlet files to target path."""
-    inventory = _load(config)
-    rendered_dir = Path(".rendered")
-    rendered = render_inventory(inventory, output_dir=rendered_dir, template_root=_template_root())
-
-    for rendered_file in rendered:
-        destination = target.expanduser() / rendered_file.relative_to(rendered_dir)
-        if execute:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(rendered_file, destination)
-            typer.echo(f"Deployed {rendered_file} -> {destination}")
-        else:
-            typer.echo(f"DRY RUN deploy {rendered_file} -> {destination}")
-
-
-@app.command()
-def apply(
-    config: ConfigPath,
-    target: TargetPath,
-    output: OutputPath = Path(".rendered"),
-    execute: ExecuteFlag = False,
-) -> None:
-    """Validate, render, deploy and reconcile changed services."""
-    inventory = _load(config)
-    rendered = render_inventory(inventory, output_dir=output, template_root=_template_root())
-
-    changed: list[tuple[InstanceSpec, Path, Path]] = []
-    by_quadlet = {instance.quadlet_path: instance for instance in inventory.instances}
-
-    for rendered_file in rendered:
-        instance = by_quadlet[rendered_file.relative_to(output).as_posix()]
-        destination = target.expanduser() / rendered_file.relative_to(output)
-        current_text = destination.read_text(encoding="utf-8") if destination.exists() else ""
-        rendered_text = rendered_file.read_text(encoding="utf-8")
-        if current_text != rendered_text:
-            changed.append((instance, rendered_file, destination))
-
-    typer.echo(
-        f"Apply plan for cluster '{inventory.cluster.name}' ({inventory.cluster.mode}): "
-        f"{len(changed)}/{len(inventory.instances)} instance(s) changed"
+def _status_needs_diagnostics(result: CommandResult) -> bool:
+    details = "\n".join(part for part in (result.stdout, result.stderr) if part).lower()
+    if result.return_code != 0:
+        return True
+    return any(
+        token in details for token in ("inactive (dead)", "failed", "activating (auto-restart)")
     )
 
-    for instance, rendered_file, destination in changed:
+
+def _status_diagnostics(service: SystemdService, instance_name: str) -> CommandResult | None:
+    logs_result = service.logs(instance_name, lines=50, execute=True)
+    if not logs_result.stdout and not logs_result.stderr:
+        return None
+    return logs_result
+
+
+def _diagnostic_summary(result: CommandResult | None) -> str | None:
+    if result is None:
+        return None
+    for line in (result.stdout or result.stderr).splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _is_tolerated_teardown_error(result: CommandResult) -> bool:
+    details = "\n".join(part for part in (result.stdout, result.stderr) if part).lower()
+    tolerated_markers = ("not loaded", "not found", "no such container", "does not exist")
+    return any(marker in details for marker in tolerated_markers)
+
+
+def _load_env_file_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists() or not path.is_file():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not _ENV_LINE_PATTERN.fullmatch(line):
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+def _instance_env_values(instance: InstanceSpec) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for raw_path in instance.env_files:
+        merged.update(_load_env_file_values(Path(raw_path).expanduser()))
+    return merged
+
+
+def _dashboard_host_url(instance: InstanceSpec) -> str:
+    gateway_port = instance.gateway_runtime.gateway_container_port
+    published_gateway_port = next(
+        (
+            port
+            for port in instance.ports
+            if port.container_port == gateway_port and port.protocol == "tcp"
+        ),
+        None,
+    )
+    host_port = published_gateway_port.host_port if published_gateway_port else gateway_port
+    return f"http://127.0.0.1:{host_port}/"
+
+
+@app.command("diagnose-dashboard")
+def diagnose_dashboard(
+    config: ConfigPath,
+    member: OptionalMemberName = None,
+    format: StatusFormat = "text",
+    show_token_url: ShowTokenUrlFlag = False,
+) -> None:
+    """Show dashboard URLs and token diagnostics for selected members."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    if not selected:
+        typer.echo("No matching members selected for dashboard diagnosis")
+        return
+
+    rows: list[dict[str, object]] = []
+    for instance in selected:
+        dashboard_url = _dashboard_host_url(instance)
+        env_values = _instance_env_values(instance)
+        token = env_values.get("OPENCLAW_GATEWAY_TOKEN", "")
+        auth_url = f"{dashboard_url}#token={token}" if token else None
+        row = {
+            "instance": instance.name,
+            "role": instance.role,
+            "dashboard_url": dashboard_url,
+            "token_present": bool(token),
+            "token_env_key": "OPENCLAW_GATEWAY_TOKEN",
+            "token_env_files": [str(Path(path).expanduser()) for path in instance.env_files],
+            "auth_url": auth_url if show_token_url else None,
+        }
+        rows.append(row)
+
+    if format == "json":
         typer.echo(
-            f" - {instance.name} [{instance.role}/{instance.profile}] "
-            f"{rendered_file} -> {destination}"
+            json.dumps(
+                {
+                    "cluster": inventory.cluster.name,
+                    "mode": inventory.cluster.mode,
+                    "instances": rows,
+                },
+                indent=2,
+            )
         )
+        return
+
+    typer.echo(f"Dashboard diagnosis for cluster '{inventory.cluster.name}'")
+    for row in rows:
+        typer.echo(f"- {row['instance']} [{row['role']}]")
+        typer.echo(f"  dashboard: {row['dashboard_url']}")
+        typer.echo(f"  token_env_key: {row['token_env_key']}")
+        typer.echo(f"  token_present: {'yes' if row['token_present'] else 'no'}")
+        for env_file in row["token_env_files"]:
+            typer.echo(f"  env_file: {env_file}")
+        if show_token_url and row["auth_url"]:
+            typer.echo(f"  auth_url: {row['auth_url']}")
+        elif row["token_present"]:
+            typer.echo("  hint: re-run with --show-token-url to print URL fragment auth")
+
+
+@app.command("setup-quadlets")
+def setup_quadlets(
+    config: ConfigPath,
+    member: OptionalMemberName = None,
+    execute: ExecuteFlag = False,
+) -> None:
+    """Render and apply desired Quadlet definitions for the current team."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    if not selected:
+        typer.echo("No matching members selected for setup")
+        return
+
+    output = Path(".rendered")
+    output.mkdir(parents=True, exist_ok=True)
+    template_root = _template_root()
+    host_map = {host.name: host for host in inventory.hosts}
+    changed_artifacts: list[tuple[InstanceSpec, Path, Path]] = []
+    changed_instance_names: set[str] = set()
+
+    for instance in selected:
+        host = host_map[instance.host]
+        for relative_path, rendered_text in render_instance_assets(
+            instance,
+            template_root=template_root,
+        ).items():
+            rendered_file = output / relative_path
+            rendered_file.parent.mkdir(parents=True, exist_ok=True)
+            rendered_file.write_text(rendered_text, encoding="utf-8")
+
+            destination = Path(host.quadlet_root).expanduser() / relative_path
+            current_text = destination.read_text(encoding="utf-8") if destination.exists() else ""
+            if current_text != rendered_text:
+                changed_artifacts.append((instance, rendered_file, destination))
+                changed_instance_names.add(instance.name)
+
+    typer.echo(
+        f"Setup plan for cluster '{inventory.cluster.name}' ({inventory.cluster.mode}): "
+        f"{len(changed_instance_names)}/{len(selected)} member(s) changed"
+    )
+
+    for instance, rendered_file, destination in changed_artifacts:
+        typer.echo(f" - {instance.name} [{instance.role}] {rendered_file} -> {destination}")
 
     if not execute:
-        for instance, _, _ in changed:
-            if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
-                archive = backup_instance(
-                    instance,
-                    output_dir=Path(".backups/instances"),
-                    execute=False,
-                )
-                typer.echo(f"DRY RUN backup plan for {instance.name}: {archive}")
-        typer.echo("DRY RUN apply complete. Re-run with --execute to mutate state.")
+        typer.echo("DRY RUN setup-quadlets complete. Re-run with --execute to mutate state.")
         return
 
     service = SystemdService()
     failed = False
+    restart_targets: list[str] = []
 
-    for instance, rendered_file, destination in changed:
-        if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
-            archive = backup_instance(instance, output_dir=Path(".backups/instances"), execute=True)
-            typer.echo(f"Backup created for {instance.name}: {archive}")
-
+    for instance, rendered_file, destination in changed_artifacts:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(rendered_file, destination)
         typer.echo(f"Deployed {rendered_file} -> {destination}")
+        if instance.name not in restart_targets:
+            restart_targets.append(instance.name)
 
-    if changed:
-        reload_result = service.daemon_reload(execute=True)
-        _print_result(reload_result)
-        failed = failed or reload_result.return_code != 0
+    reload_result = service.daemon_reload(execute=True)
+    _print_result(reload_result)
+    failed = failed or reload_result.return_code != 0
 
-        for instance, _, _ in changed:
-            restart_result = service.restart(instance.name, execute=True)
-            _print_result(restart_result)
-            failed = failed or restart_result.return_code != 0
+    if not changed_artifacts:
+        typer.echo("No rendered changes detected; daemon-reload completed.")
+
+    for instance_name in restart_targets:
+        restart_result = service.restart(instance_name, execute=True)
+        _print_result(restart_result)
+        failed = failed or restart_result.return_code != 0
 
     if failed:
         raise typer.Exit(code=1)
 
 
-@app.command()
-def restart(instance: str, execute: ExecuteFlag = False) -> None:
-    """Reload/restart a systemd user service."""
-    service = SystemdService()
-    result = service.restart(instance, execute=execute)
-    _print_result(result)
-
-
-@app.command()
-def status(instance: str, execute: ExecuteFlag = False) -> None:
-    """Inspect status for a service."""
-    service = SystemdService()
-    result = service.status(instance, execute=execute)
-    _print_result(result)
-
-
-@app.command("status-cluster")
-def status_cluster(
+@app.command("restart-quadlets")
+def restart_quadlets(
     config: ConfigPath,
+    member: OptionalMemberName = None,
     execute: ExecuteFlag = False,
+) -> None:
+    """Restart selected or all managed services after config/image changes."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    if not selected:
+        typer.echo("No matching members selected for restart")
+        return
+
+    service = SystemdService()
+    failed = False
+    for instance in selected:
+        result = service.restart(instance.name, execute=execute)
+        _print_result(result)
+        if result.return_code != 0:
+            failed = True
+
+    if not execute:
+        typer.echo("DRY RUN restart-quadlets complete. Re-run with --execute to mutate state.")
+        return
+
+    if failed:
+        raise typer.Exit(code=1)
+
+
+@app.command("status-quadlets")
+def status_quadlets(
+    config: ConfigPath,
+    member: OptionalMemberName = None,
     format: StatusFormat = "text",
 ) -> None:
-    """Inspect status for all services in a cluster."""
+    """Aggregate per-member runtime status with optional machine-readable output."""
     inventory = _load(config)
+    selected = _select_instances(inventory, member)
     service = SystemdService()
     rows: list[dict[str, object]] = []
 
-    for instance in inventory.instances:
-        result = service.status(instance.name, execute=execute)
+    for instance in selected:
+        result = service.status(instance.name, execute=True)
+        diagnostics = None
+        if _status_needs_diagnostics(result):
+            diagnostics = _status_diagnostics(service, instance.name)
         row = {
             "instance": instance.name,
             "role": instance.role,
-            "profile": instance.profile,
-            "state": _status_state(result, execute),
+            "state": _status_state(result),
             "return_code": result.return_code,
             "unit": service.unit_name(instance.name),
             "stdout": result.stdout,
             "stderr": result.stderr,
+            "diagnostics": (
+                diagnostics.stdout
+                if diagnostics and diagnostics.stdout
+                else diagnostics.stderr
+                if diagnostics
+                else ""
+            ),
         }
         rows.append(row)
 
@@ -252,114 +341,73 @@ def status_cluster(
         typer.echo(f"Cluster: {inventory.cluster.name} ({inventory.cluster.mode})")
         for row in rows:
             typer.echo(
-                f"- {row['instance']} [{row['role']}/{row['profile']}] "
-                f"state={row['state']} rc={row['return_code']}"
+                f"- {row['instance']} [{row['role']}] state={row['state']} rc={row['return_code']}"
             )
+            diagnostics_summary = _diagnostic_summary(
+                CommandResult(command=[], return_code=0, stdout=str(row["diagnostics"]), stderr="")
+                if row["diagnostics"]
+                else None
+            )
+            if diagnostics_summary:
+                typer.echo(f"  cause: {diagnostics_summary}")
 
-    if execute and any(int(row["return_code"]) != 0 for row in rows):
+    if any(int(row["return_code"]) != 0 for row in rows):
         raise typer.Exit(code=1)
 
 
-@app.command()
-def logs(
-    instance: str,
-    lines: Annotated[int, typer.Option("--lines")] = 100,
+@app.command("teardown-quadlets")
+def teardown_quadlets(
+    config: ConfigPath,
+    member: OptionalMemberName = None,
     execute: ExecuteFlag = False,
 ) -> None:
-    """Collect logs for a service."""
+    """Remove managed runtime services for selected members or whole teams."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    if not selected:
+        typer.echo("No matching members selected for teardown")
+        return
+
+    host_map = {host.name: host for host in inventory.hosts}
     service = SystemdService()
-    result = service.logs(instance, lines=lines, execute=execute)
-    _print_result(result)
+    failed = False
 
-
-@app.command()
-def backup(
-    config: ConfigPath,
-    instance: InstanceName,
-    output: OutputPath = Path(".backups"),
-    execute: ExecuteFlag = False,
-) -> None:
-    """Backup workspace/config/state for an instance."""
-    inventory = _load(config)
-    chosen = _instance_by_name(inventory, instance)
-    archive = backup_instance(chosen, output_dir=output, execute=execute)
-    if execute:
-        typer.echo(f"Backup created: {archive}")
-    else:
-        typer.echo(f"DRY RUN backup would create: {archive}")
-
-
-@app.command()
-def upgrade(
-    config: ConfigPath,
-    instance: InstanceName,
-    tag: TagValue = None,
-    digest: DigestValue = None,
-    execute: ExecuteFlag = False,
-) -> None:
-    """Perform a controlled upgrade by changing target image tag/digest."""
-    inventory = _load(config)
-    chosen = _instance_by_name(inventory, instance)
-
-    plan = build_upgrade_plan(config, instance, next_tag=tag, next_digest=digest)
     typer.echo(
-        f"Upgrade plan for {plan.instance}: "
-        f"{plan.previous_tag}@{plan.previous_digest} -> {plan.next_tag}@{plan.next_digest}"
+        f"Teardown plan for cluster '{inventory.cluster.name}': {len(selected)} member(s) "
+        f"(execute={execute})"
     )
 
-    if chosen.backup_policy.enabled and chosen.backup_policy.pre_mutation:
-        instance_backup = backup_instance(
-            chosen,
-            output_dir=Path(".backups/instances"),
-            execute=execute,
-        )
-        if execute:
-            typer.echo(f"Instance backup created: {instance_backup}")
-        else:
-            typer.echo(f"DRY RUN instance backup would create: {instance_backup}")
+    for chosen in selected:
+        host = host_map[chosen.host]
+        quadlet_targets = [
+            Path(host.quadlet_root).expanduser() / artifact_path
+            for artifact_path in chosen.quadlet_artifact_paths
+        ]
+
+        typer.echo(f"- Teardown {chosen.name} [{chosen.role}]")
+        results = [
+            service.stop(chosen.name, execute=execute),
+            service.disable(chosen.name, execute=execute),
+            service.remove_container(chosen.container_name, execute=execute),
+        ]
+        for quadlet_target in quadlet_targets:
+            results.append(service.remove_quadlet(str(quadlet_target), execute=execute))
+        for result in results:
+            _print_result(result)
+            if result.return_code != 0 and not _is_tolerated_teardown_error(result):
+                failed = True
+
+    reload_result = service.daemon_reload(execute=execute)
+    _print_result(reload_result)
+    if reload_result.return_code != 0:
+        failed = True
 
     if not execute:
-        typer.echo("DRY RUN: no config changes written")
+        typer.echo("DRY RUN teardown-quadlets complete. Re-run with --execute to mutate state.")
         return
 
-    backup_path = backup_config(config, output_dir=Path(".backups/config"))
-    applied = apply_upgrade(config, instance, next_tag=tag, next_digest=digest)
-    typer.echo(f"Backed up config to {backup_path}")
-    typer.echo(f"Applied upgrade to {applied.next_tag}@{applied.next_digest}")
-
-
-@app.command()
-def rollback(
-    config: ConfigPath,
-    instance: InstanceName,
-    execute: ExecuteFlag = False,
-) -> None:
-    """Rollback an instance digest to known-good."""
-    inventory = _load(config)
-    chosen = _instance_by_name(inventory, instance)
-
-    if chosen.backup_policy.enabled and chosen.backup_policy.pre_mutation:
-        instance_backup = backup_instance(
-            chosen,
-            output_dir=Path(".backups/instances"),
-            execute=execute,
-        )
-        if execute:
-            typer.echo(f"Instance backup created: {instance_backup}")
-        else:
-            typer.echo(f"DRY RUN instance backup would create: {instance_backup}")
-
-    if not execute:
-        typer.echo("DRY RUN rollback requires --execute to mutate config")
-        return
-
-    backup_path = backup_config(config, output_dir=Path(".backups/config"))
-    plan = rollback_to_known_good(config, instance)
-    typer.echo(f"Backed up config to {backup_path}")
-    typer.echo(
-        f"Rolled back {plan.instance}: "
-        f"{plan.previous_tag}@{plan.previous_digest} -> {plan.next_tag}@{plan.next_digest}"
-    )
+    if failed:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

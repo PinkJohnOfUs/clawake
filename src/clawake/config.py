@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
@@ -60,6 +63,13 @@ class BackupPolicy(BaseModel):
     paths: list[str] = Field(default_factory=list)
 
 
+class GatewayRuntimeSpec(BaseModel):
+    enabled: bool = False
+    bind: Literal["loopback", "lan", "tailnet", "auto", "custom"] = "lan"
+    gateway_container_port: int = Field(default=18789, ge=1, le=65535)
+    bridge_container_port: int = Field(default=18790, ge=1, le=65535)
+
+
 class DashboardMeta(BaseModel):
     friendly_name: str
     owner: str | None = None
@@ -71,10 +81,8 @@ class InstanceSpec(BaseModel):
     name: str
     host: str
     role: Literal["product_owner", "developer"]
-    profile: Literal["public", "internal"]
     workspace_path: str
-    config_path: str
-    state_path: str
+    team_definition_path: str
     service_scope: Literal["user"] = "user"
     quadlet_path: str
     container_name: str
@@ -87,17 +95,40 @@ class InstanceSpec(BaseModel):
     health: HealthSpec = Field(default_factory=HealthSpec)
     update_policy: UpdatePolicy = Field(default_factory=UpdatePolicy)
     backup_policy: BackupPolicy = Field(default_factory=BackupPolicy)
+    gateway_runtime: GatewayRuntimeSpec = Field(default_factory=GatewayRuntimeSpec)
     dashboard: DashboardMeta
 
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:
+        quadlet = Path(self.quadlet_path)
+        if quadlet.suffix != ".container":
+            raise ValueError(
+                f"instances[{self.name}].quadlet_path must end with '.container': "
+                f"'{self.quadlet_path}'"
+            )
         if not self.backup_policy.paths:
             self.backup_policy.paths = [
                 self.workspace_path,
-                self.config_path,
-                self.state_path,
+                self.team_definition_path,
             ]
         return self
+
+    @property
+    def network_quadlet_path(self) -> str:
+        return str(Path(self.quadlet_path).with_suffix(".network"))
+
+    @property
+    def runtime_volume_quadlet_path(self) -> str:
+        container_path = Path(self.quadlet_path)
+        return str(container_path.with_name(f"{container_path.stem}-state.volume"))
+
+    @property
+    def quadlet_artifact_paths(self) -> list[str]:
+        return [
+            self.quadlet_path,
+            self.network_quadlet_path,
+            self.runtime_volume_quadlet_path,
+        ]
 
 
 class Inventory(BaseModel):
@@ -108,6 +139,26 @@ class Inventory(BaseModel):
 
     @model_validator(mode="after")
     def validate_inventory(self) -> Inventory:
+        def _expand_path(raw_path: str) -> str:
+            expanded = os.path.expandvars(raw_path)
+            expanded = expanded.replace(
+                "${workspaceFolder}",
+                os.environ.get("CLAWAKE_WORKSPACE_ROOT", ""),
+            )
+            return str(Path(expanded).expanduser())
+
+        def _validate_safe_absolute_path(label: str, raw_path: str) -> str:
+            path = Path(_expand_path(raw_path))
+            if not path.is_absolute():
+                raise ValueError(f"{label} must be an absolute path: '{raw_path}'")
+            normalized = str(path)
+            if "//" in normalized:
+                raise ValueError(f"{label} must not contain repeated slashes: '{raw_path}'")
+            parts = set(path.parts)
+            if "." in parts or ".." in parts:
+                raise ValueError(f"{label} must not contain dot segments: '{raw_path}'")
+            return normalized
+
         host_names = {host.name for host in self.hosts}
         if len(host_names) != len(self.hosts):
             raise ValueError("Duplicate host names are not allowed")
@@ -133,6 +184,45 @@ class Inventory(BaseModel):
                 raise ValueError(f"Duplicate instance name '{instance.name}'")
             instance_names.add(instance.name)
 
+            _validate_safe_absolute_path(
+                f"instances[{instance.name}].workspace_path",
+                instance.workspace_path,
+            )
+            _validate_safe_absolute_path(
+                f"instances[{instance.name}].team_definition_path",
+                instance.team_definition_path,
+            )
+            for env_file in instance.env_files:
+                _validate_safe_absolute_path(
+                    f"instances[{instance.name}].env_files",
+                    env_file,
+                )
+            for mount in instance.mounts:
+                source = _validate_safe_absolute_path(
+                    f"instances[{instance.name}].mounts.source",
+                    mount.source,
+                )
+                if ":" in source:
+                    raise ValueError(
+                        f"instances[{instance.name}].mounts.source must not contain ':'"
+                    )
+                _validate_safe_absolute_path(
+                    f"instances[{instance.name}].mounts.target",
+                    mount.target,
+                )
+
+            if instance.gateway_runtime.enabled:
+                expected = {
+                    instance.gateway_runtime.gateway_container_port,
+                    instance.gateway_runtime.bridge_container_port,
+                }
+                actual = {port.container_port for port in instance.ports}
+                if not expected.issubset(actual):
+                    raise ValueError(
+                        f"Instance '{instance.name}' enables gateway_runtime but is missing "
+                        f"container ports {sorted(expected)}"
+                    )
+
             for port in instance.ports:
                 port_key = (instance.host, port.bind_address, port.host_port, port.protocol)
                 if port_key in used_ports:
@@ -145,11 +235,10 @@ class Inventory(BaseModel):
 
             storage_paths = {
                 "workspace_path": instance.workspace_path,
-                "config_path": instance.config_path,
-                "state_path": instance.state_path,
+                "team_definition_path": instance.team_definition_path,
             }
             for boundary, raw_path in storage_paths.items():
-                normalized = str(Path(raw_path).expanduser())
+                normalized = _expand_path(raw_path)
                 existing = used_paths.get(normalized)
                 if existing is not None:
                     raise ValueError(
@@ -161,9 +250,39 @@ class Inventory(BaseModel):
         return self
 
 
+def _expand_string_values(value: object, env: Mapping[str, str]) -> object:
+    def _expand_with_env(text: str) -> str:
+        pattern = re.compile(r"\$(\w+)|\$\{([^}]+)\}")
+
+        def _replace(match: re.Match[str]) -> str:
+            key = match.group(1) or match.group(2)
+            return env.get(key, match.group(0))
+
+        return pattern.sub(_replace, text)
+
+    if isinstance(value, str):
+        return _expand_with_env(value)
+    if isinstance(value, list):
+        return [_expand_string_values(item, env) for item in value]
+    if isinstance(value, dict):
+        return {key: _expand_string_values(item, env) for key, item in value.items()}
+    return value
+
+
 def load_inventory(path: str | Path) -> Inventory:
     inventory_path = Path(path)
     data = yaml.safe_load(inventory_path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("Inventory file must contain a YAML mapping")
-    return Inventory.model_validate(data)
+
+    resolved_path = inventory_path.resolve()
+    workspace_root = (
+        resolved_path.parents[2] if len(resolved_path.parents) >= 3 else resolved_path.parent
+    )
+    expansion_env = {
+        **os.environ,
+        "workspaceFolder": os.environ.get("CLAWAKE_WORKSPACE_ROOT", str(workspace_root)),
+        "CLAWAKE_WORKSPACE_ROOT": os.environ.get("CLAWAKE_WORKSPACE_ROOT", str(workspace_root)),
+    }
+    expanded_data = _expand_string_values(data, expansion_env)
+    return Inventory.model_validate(expanded_data)
