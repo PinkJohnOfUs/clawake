@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 
 include make/clawake.mk
+include make/staff-image.mk
 
 help: ## Show help for main targets
 	@# Modified from https://gist.github.com/prwhite/8168133?permalink_comment_id=4260260#gistcomment-4260260
