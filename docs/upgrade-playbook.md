@@ -2,8 +2,8 @@
 
 This playbook follows the lifecycle-first operator model.
 
-1. Validate team definition:
-   - `clawake validate -c examples/staff/team.yml`
+1. Diagnose dashboard access and token wiring:
+   - `clawake diagnose-dashboard -c examples/staff/team.yml`
 2. Apply or refresh Quadlet definitions:
    - `clawake setup-quadlets -c examples/staff/team.yml`
 3. Restart impacted services:
