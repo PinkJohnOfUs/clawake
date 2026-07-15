@@ -1,6 +1,6 @@
 PODMAN ?= podman
 
-STAFF_DOCKERFILE ?= staff/Dockerfile
+STAFF_DOCKERFILE ?= examples/staff/Dockerfile
 STAFF_IMAGE_REPOSITORY ?= ghcr.io/openclaw/openclaw-staff
 STAFF_IMAGE_TAG ?= 2026.6.11-tools
 
