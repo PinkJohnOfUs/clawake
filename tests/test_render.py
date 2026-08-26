@@ -25,7 +25,7 @@ def test_render_contains_expected_container_data() -> None:
     assert (
         "Exec=openclaw gateway run "
         f"--bind {instance.gateway_runtime.bind} "
-        f"--port {instance.gateway_runtime.gateway_container_port}"
+        f"--port {instance.gateway_runtime.gateway_container_port} --allow-unconfigured"
     ) in rendered
 
 

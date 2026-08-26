@@ -237,24 +237,29 @@ def setup_quadlets(
 
     service = SystemdService()
     failed = False
-    restart_targets: list[str] = []
 
-    for instance, rendered_file, destination in changed_artifacts:
+    # Podman requires bind-mount sources to exist before starting the unit.
+    for instance in selected:
+        runtime_state = Path(instance.workspace_path).expanduser() / ".openclaw"
+        runtime_state.mkdir(parents=True, exist_ok=True)
+
+    for _instance, rendered_file, destination in changed_artifacts:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(rendered_file, destination)
         typer.echo(f"Deployed {rendered_file} -> {destination}")
-        if instance.name not in restart_targets:
-            restart_targets.append(instance.name)
 
     reload_result = service.daemon_reload(execute=True)
     _print_result(reload_result)
     failed = failed or reload_result.return_code != 0
 
     if not changed_artifacts:
-        typer.echo("No rendered changes detected; daemon-reload completed.")
+        typer.echo("No rendered changes detected; ensuring selected services are running.")
 
-    for instance_name in restart_targets:
-        restart_result = service.restart(instance_name, execute=True)
+    # Setup is an idempotent reconciliation operation: even when the rendered
+    # Quadlets already match, the selected service may be stopped or may never
+    # have been started. Restart every selected member after daemon-reload.
+    for instance in selected:
+        restart_result = service.restart(instance.name, execute=True)
         _print_result(restart_result)
         failed = failed or restart_result.return_code != 0
 

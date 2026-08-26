@@ -151,8 +151,42 @@ def test_setup_quadlets_execute_deploys_files(monkeypatch: object, tmp_path: Pat
     assert (quadlet_root / "one.container").is_file()
     assert (quadlet_root / "one.network").is_file()
     assert (quadlet_root / "one-state.volume").is_file()
+    assert (_workspace / ".openclaw").is_dir()
     assert RecordingSystemdService.daemon_reload_calls == 1
     assert RecordingSystemdService.restart_calls == 1
+
+
+def test_setup_quadlets_execute_starts_unchanged_service(
+    monkeypatch: object, tmp_path: Path
+) -> None:
+    from clawake import cli
+
+    class RecordingSystemdService:
+        restart_calls = 0
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            return CommandResult(["systemctl", "--user", "daemon-reload"], 0, "ok", "")
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            RecordingSystemdService.restart_calls += 1
+            return CommandResult(
+                ["systemctl", "--user", "restart", f"{instance_name}.service"],
+                0,
+                "ok",
+                "",
+            )
+
+    quadlet_root = tmp_path / "quadlets"
+    cfg, _env_file, _workspace = _write_inventory(tmp_path, quadlet_root=quadlet_root)
+    monkeypatch.setattr(cli, "SystemdService", RecordingSystemdService)
+
+    first = runner.invoke(app, ["setup-quadlets", "--config", str(cfg), "--execute"])
+    second = runner.invoke(app, ["setup-quadlets", "--config", str(cfg), "--execute"])
+
+    assert first.exit_code == 0
+    assert second.exit_code == 0
+    assert "ensuring selected services are running" in second.output
+    assert RecordingSystemdService.restart_calls == 2
 
 
 def test_restart_quadlets_execute_propagates_failures(monkeypatch: object, tmp_path: Path) -> None:
