@@ -24,10 +24,11 @@ Dieses Team besteht aus drei voneinander isolierten OpenClaw-Instanzen:
 Voraussetzungen: rootless Podman, systemd-Userdienste, `uv` und ein verfuegbares
 OpenClaw-Image. Im Repository:
 
-Das Team verwendet das oeffentlich abrufbare Basisimage
-`ghcr.io/openclaw/openclaw:2026.8.2`, zusaetzlich fest auf den geprueften
-Image-Digest gepinnt. Das private Beispielimage `openclaw-staff` ist nicht
-erforderlich.
+Das Team verwendet oeffentlich abrufbare OpenClaw-Images der Version `2026.8.2`,
+zusaetzlich fest auf gepruefte Image-Digests gepinnt. Der Alltags-Navigator nutzt
+die offizielle `2026.8.2-browser`-Variante mit Chromium und Playwright; die anderen
+Mitglieder verwenden das Standardimage. Das private Beispielimage `openclaw-staff`
+ist nicht erforderlich.
 
 ```bash
 # Auf CachyOS/Arch einmalig (auf diesem System fehlen uv und Podman noch):

@@ -46,6 +46,17 @@ def test_render_assets_include_container_network_and_volume() -> None:
     assert f"Options=device={instance.workspace_path}/.openclaw" in volume_text
 
 
+def test_browser_image_renders_writable_openclaw_cache_tmpfs() -> None:
+    inventory = load_inventory(Path("examples/staff/team.yml"))
+    instance = inventory.instances[0].model_copy(deep=True)
+    instance.image.tag = "2026.8.2-browser"
+
+    rendered = render_instance(instance, template_root=Path("templates"))
+
+    assert "Volume=" in rendered
+    assert "/.openclaw/cache/openclaw-1000:/home/node/.cache/openclaw-1000" in rendered
+
+
 def test_render_inventory_writes_all_quadlet_artifacts(tmp_path: Path) -> None:
     inventory = load_inventory(Path("examples/staff/team.yml"))
     rendered_paths = render_inventory(

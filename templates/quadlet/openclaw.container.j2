@@ -7,6 +7,9 @@ Wants=network-online.target
 ContainerName={{ instance.container_name }}
 Image={{ image_ref }}
 UserNS=keep-id:uid=1000,gid=1000
+{% if browser_image %}
+Volume={{ browser_cache_path }}:/home/node/.cache/openclaw-1000
+{% endif %}
 {% for env_file in instance.env_files %}
 EnvironmentFile={{ env_file }}
 {% endfor %}

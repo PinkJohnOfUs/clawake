@@ -17,6 +17,8 @@ from clawake.services.image_check import ImageCheckError, check_image_availabili
 from clawake.services.render import render_instance_assets
 from clawake.services.runtime_upgrade import (
     doctor_command,
+    ensure_browser_cache,
+    is_browser_image,
     run_doctor,
     verify_runtime,
     wait_for_health,
@@ -221,6 +223,10 @@ def upgrade_member(
             runtime_backup = backup_instance(instance, backup_dir, execute=True)
             typer.echo(f"Created config backup: {config_backup}")
             typer.echo(f"Created runtime backup: {runtime_backup}")
+
+        if is_browser_image(target):
+            cache_path = ensure_browser_cache(instance)
+            typer.echo(f"Prepared private browser cache: {cache_path}")
 
         typer.echo("Running OpenClaw safe migrations in a one-shot container...")
         doctor_result = run_doctor(instance, target)
@@ -434,6 +440,8 @@ def setup_quadlets(
     for instance in selected:
         runtime_state = Path(instance.workspace_path).expanduser() / ".openclaw"
         runtime_state.mkdir(parents=True, exist_ok=True)
+        if is_browser_image(instance.image):
+            ensure_browser_cache(instance)
         gateway_config, gateway_config_changed = ensure_control_ui_config(instance)
         if gateway_config_changed:
             typer.echo(f"Updated local Control UI access in {gateway_config}")

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 
 from clawake.config import ImageSpec, InstanceSpec
 
@@ -22,8 +24,32 @@ def image_ref(image: ImageSpec) -> str:
     return f"{base}@{image.digest}" if image.digest else base
 
 
+def runtime_version_from_tag(tag: str) -> str:
+    """Return the OpenClaw version encoded in official image variant tags."""
+    return re.sub(r"-(?:browser|slim)(?:-(?:amd64|arm64))?$", "", tag)
+
+
+def is_browser_image(image: ImageSpec) -> bool:
+    return bool(re.search(r"-browser(?:-(?:amd64|arm64))?$", image.tag))
+
+
+def browser_cache_path(instance: InstanceSpec) -> Path:
+    return Path(instance.workspace_path) / ".openclaw" / "cache" / "openclaw-1000"
+
+
+def ensure_browser_cache(instance: InstanceSpec) -> Path:
+    path = browser_cache_path(instance)
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.chmod(0o700)
+    return path
+
+
 def doctor_command(instance: InstanceSpec, image: ImageSpec) -> list[str]:
     command = ["podman", "run", "--rm", "--userns=keep-id:uid=1000,gid=1000"]
+    if is_browser_image(image):
+        command.extend(
+            ["--volume", f"{browser_cache_path(instance)}:/home/node/.cache/openclaw-1000"]
+        )
     for env_file in instance.env_files:
         command.extend(["--env-file", env_file])
     command.extend(
@@ -100,12 +126,13 @@ def verify_runtime(instance: InstanceSpec, expected: ImageSpec) -> RuntimeCheck:
             image_name=running_image,
             error=f"running image '{running_image}' does not match '{expected_ref}'",
         )
-    if expected.tag not in version.stdout:
+    expected_version = runtime_version_from_tag(expected.tag)
+    if expected_version not in version.stdout:
         return RuntimeCheck(
             False,
             version=version.stdout.strip(),
             image_name=running_image,
-            error=f"runtime version does not contain expected tag '{expected.tag}'",
+            error=f"runtime version does not contain expected version '{expected_version}'",
         )
     return RuntimeCheck(True, version=version.stdout.strip(), image_name=running_image)
 
