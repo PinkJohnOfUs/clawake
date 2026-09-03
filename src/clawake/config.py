@@ -35,6 +35,7 @@ class ImageSpec(BaseModel):
     tag: str
     digest: str | None = None
     known_good_digest: str | None = None
+    known_good_tag: str | None = None
 
 
 class PortSpec(BaseModel):
@@ -66,7 +67,7 @@ class UpdatePolicy(BaseModel):
 class BackupPolicy(BaseModel):
     enabled: bool = True
     pre_mutation: bool = True
-    retention: int = 5
+    retention: int = Field(default=5, ge=1)
     paths: list[str] = Field(default_factory=list)
 
 

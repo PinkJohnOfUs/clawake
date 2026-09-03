@@ -10,10 +10,19 @@ from typing import Annotated, Literal
 
 import typer
 
-from clawake.config import InstanceSpec, Inventory, load_inventory
+from clawake.config import ImageSpec, InstanceSpec, Inventory, load_inventory
+from clawake.services.backup import backup_instance, prune_backups
 from clawake.services.gateway_config import ensure_control_ui_config
+from clawake.services.image_check import ImageCheckError, check_image_availability
 from clawake.services.render import render_instance_assets
+from clawake.services.runtime_upgrade import (
+    doctor_command,
+    run_doctor,
+    verify_runtime,
+    wait_for_health,
+)
 from clawake.services.systemd import CommandResult, SystemdService
+from clawake.services.upgrade import apply_upgrade, backup_config, build_upgrade_plan
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
@@ -24,6 +33,8 @@ OptionalMemberName = Annotated[str | None, typer.Option("--member", "-m")]
 ExecuteFlag = Annotated[bool, typer.Option("--execute")]
 StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
 ShowTokenUrlFlag = Annotated[bool, typer.Option("--show-token-url")]
+TargetTag = Annotated[str, typer.Option(..., "--to", help="Target OpenClaw image tag")]
+TargetDigest = Annotated[str | None, typer.Option("--digest", help="Immutable target digest")]
 
 _ENV_LINE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
@@ -129,6 +140,146 @@ def _dashboard_host_url(instance: InstanceSpec) -> str:
     )
     host_port = published_gateway_port.host_port if published_gateway_port else gateway_port
     return f"http://127.0.0.1:{host_port}/"
+
+
+def _deploy_instance_assets(
+    instance: InstanceSpec,
+    inventory: Inventory,
+    output: Path = Path(".rendered"),
+) -> list[Path]:
+    host_map = {host.name: host for host in inventory.hosts}
+    destination_root = Path(host_map[instance.host].quadlet_root).expanduser()
+    deployed: list[Path] = []
+    for relative_path, rendered_text in render_instance_assets(
+        instance, template_root=_template_root()
+    ).items():
+        rendered_file = output / relative_path
+        rendered_file.parent.mkdir(parents=True, exist_ok=True)
+        rendered_file.write_text(rendered_text, encoding="utf-8")
+        destination = destination_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(rendered_file, destination)
+        deployed.append(destination)
+    return deployed
+
+
+@app.command("upgrade")
+def upgrade_member(
+    config: ConfigPath,
+    member: Annotated[str, typer.Option(..., "--member", "-m")],
+    target_tag: TargetTag,
+    digest: TargetDigest = None,
+    execute: ExecuteFlag = False,
+) -> None:
+    """Safely upgrade one member, including backup, migration, and health checks."""
+    inventory = _load(config)
+    instance = _instance_by_name(inventory, member)
+    target_digest = digest
+    if target_digest is None and target_tag == instance.image.tag:
+        target_digest = instance.image.digest
+    if not target_digest:
+        raise typer.BadParameter(
+            "An immutable --digest is required when changing tags; "
+            "Clawake will not follow an unpinned image tag."
+        )
+
+    plan = build_upgrade_plan(config, member, target_tag, target_digest)
+    target = ImageSpec(
+        repository=instance.image.repository,
+        tag=plan.next_tag,
+        digest=plan.next_digest,
+    )
+    typer.echo(f"Upgrade plan for member '{member}':")
+    typer.echo(f"  image: {plan.previous_tag} -> {plan.next_tag}")
+    typer.echo(f"  digest: {plan.previous_digest or 'unpinned'} -> {plan.next_digest}")
+    typer.echo(f"  backup: {'yes' if instance.backup_policy.pre_mutation else 'no'}")
+    typer.echo(f"  migration: {' '.join(doctor_command(instance, target)[-5:])}")
+    typer.echo(f"  health: {_dashboard_host_url(instance).rstrip('/')}{instance.health.path}")
+    if not execute:
+        typer.echo("DRY RUN upgrade complete. Re-run with --execute to mutate state.")
+        return
+
+    service = SystemdService()
+    backup_dir = Path(".backups")
+    stopped = False
+    config_changed = False
+    runtime_backup: Path | None = None
+    config_backup: Path | None = None
+
+    try:
+        typer.echo("Verifying pinned image in registry...")
+        check_image_availability(target)
+
+        stop_result = service.stop(instance.name, execute=True)
+        _print_result(stop_result)
+        if stop_result.return_code != 0:
+            raise RuntimeError(stop_result.stderr or "failed to stop service")
+        stopped = True
+
+        if instance.backup_policy.enabled and instance.backup_policy.pre_mutation:
+            config_backup = backup_config(config, backup_dir)
+            runtime_backup = backup_instance(instance, backup_dir, execute=True)
+            typer.echo(f"Created config backup: {config_backup}")
+            typer.echo(f"Created runtime backup: {runtime_backup}")
+
+        typer.echo("Running OpenClaw safe migrations in a one-shot container...")
+        doctor_result = run_doctor(instance, target)
+        if doctor_result.returncode != 0:
+            details = doctor_result.stderr.strip() or doctor_result.stdout.strip()
+            raise RuntimeError(f"OpenClaw migration failed: {details}")
+
+        apply_upgrade(config, instance.name, target.tag, target.digest)
+        config_changed = True
+        updated_inventory = _load(config)
+        updated_instance = _instance_by_name(updated_inventory, member)
+        ensure_control_ui_config(updated_instance)
+        for deployed in _deploy_instance_assets(updated_instance, updated_inventory):
+            typer.echo(f"Deployed {deployed}")
+
+        reload_result = service.daemon_reload(execute=True)
+        _print_result(reload_result)
+        if reload_result.return_code != 0:
+            raise RuntimeError(reload_result.stderr or "systemd daemon-reload failed")
+
+        restart_result = service.restart(instance.name, execute=True)
+        _print_result(restart_result)
+        if restart_result.return_code != 0:
+            raise RuntimeError(restart_result.stderr or "service restart failed")
+
+        healthy, health_details = wait_for_health(updated_instance)
+        if not healthy:
+            raise RuntimeError(f"health check failed: {health_details}")
+
+        runtime = verify_runtime(updated_instance, target)
+        if not runtime.healthy:
+            raise RuntimeError(f"runtime verification failed: {runtime.error}")
+
+        typer.echo(f"Upgrade complete: {runtime.version}")
+        typer.echo(f"Running image: {runtime.image_name}")
+        typer.echo(f"Health check: {health_details}")
+        if runtime_backup:
+            prune_backups(backup_dir, f"{instance.name}-", instance.backup_policy.retention)
+        if config_backup:
+            prune_backups(backup_dir, f"{config.stem}-", instance.backup_policy.retention)
+    except (ImageCheckError, OSError, RuntimeError, ValueError) as exc:
+        typer.echo(f"Upgrade failed: {exc}", err=True)
+        if stopped and not config_changed:
+            typer.echo("The config was not changed; attempting to restart the previous image.")
+            recovery = service.restart(instance.name, execute=True)
+            _print_result(recovery)
+        elif config_changed:
+            typer.echo("Stopping the failed upgraded service to prevent a restart loop.", err=True)
+            stopped_result = service.stop(instance.name, execute=True)
+            _print_result(stopped_result)
+        if runtime_backup:
+            typer.echo(f"Runtime recovery archive: {runtime_backup}", err=True)
+        if config_backup:
+            typer.echo(f"Config recovery file: {config_backup}", err=True)
+        typer.echo(
+            f"Inspect logs with: journalctl --user-unit {service.unit_name(instance.name)} -n 100",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("onboard-member")

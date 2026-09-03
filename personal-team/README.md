@@ -25,7 +25,7 @@ Voraussetzungen: rootless Podman, systemd-Userdienste, `uv` und ein verfuegbares
 OpenClaw-Image. Im Repository:
 
 Das Team verwendet das oeffentlich abrufbare Basisimage
-`ghcr.io/openclaw/openclaw:2026.7.1-2`, zusaetzlich fest auf den geprueften
+`ghcr.io/openclaw/openclaw:2026.8.2`, zusaetzlich fest auf den geprueften
 Image-Digest gepinnt. Das private Beispielimage `openclaw-staff` ist nicht
 erforderlich.
 

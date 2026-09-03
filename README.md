@@ -114,6 +114,7 @@ In CI, set `CLAWAKE_PROJECT_ROOT` to the repository checkout path.
 
 - `clawake setup-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
 - `clawake restart-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+- `clawake upgrade --config|-c <staff.yaml> --member|-m <name> --to <tag> --digest <sha256> [--execute]`
 - `clawake status-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--format text|json]`
 - `clawake teardown-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
 

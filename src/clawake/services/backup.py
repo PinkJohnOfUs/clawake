@@ -97,3 +97,16 @@ def backup_instance(instance: InstanceSpec, output_dir: Path, execute: bool = Fa
                 )
 
     return archive_path
+
+
+def prune_backups(output_dir: Path, prefix: str, retention: int) -> list[Path]:
+    """Remove older matching backups while retaining the newest requested count."""
+    candidates = sorted(
+        (path for path in output_dir.glob(f"{prefix}*") if path.is_file()),
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        reverse=True,
+    )
+    removed = candidates[retention:]
+    for path in removed:
+        path.unlink()
+    return removed

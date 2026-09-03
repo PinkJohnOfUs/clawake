@@ -2,7 +2,7 @@ import tarfile
 from pathlib import Path
 
 from clawake.config import BackupPolicy, DashboardMeta, ImageSpec, InstanceSpec
-from clawake.services.backup import backup_instance
+from clawake.services.backup import backup_instance, prune_backups
 
 
 def _instance_with_paths(workspace: Path, team_definition_path: Path) -> InstanceSpec:
@@ -87,3 +87,18 @@ def test_backup_instance_skips_legacy_workspace_runtime_tree(tmp_path: Path) -> 
 
     assert any(name.endswith("/README.txt") for name in members)
     assert not any("/.clawake/" in name for name in members)
+
+
+def test_prune_backups_retains_newest_matching_files(tmp_path: Path) -> None:
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    paths = [backups / f"one-{number}.tar.gz" for number in range(3)]
+    for path in paths:
+        path.write_text(path.name, encoding="utf-8")
+
+    removed = prune_backups(backups, "one-", retention=2)
+
+    assert removed == [paths[0]]
+    assert not paths[0].exists()
+    assert paths[1].exists()
+    assert paths[2].exists()

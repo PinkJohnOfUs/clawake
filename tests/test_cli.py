@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 from typer.testing import CliRunner
@@ -126,6 +127,111 @@ def test_onboard_member_dry_run_uses_managed_workspace(tmp_path: Path) -> None:
     assert "--skip-bootstrap" in result.output
     assert "--no-install-daemon" in result.output
     assert "DRY RUN onboard-member complete" in result.output
+
+
+def test_upgrade_dry_run_requires_no_runtime_calls(tmp_path: Path) -> None:
+    cfg, _env_file, _workspace = _write_inventory(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "upgrade",
+            "--config",
+            str(cfg),
+            "--member",
+            "one",
+            "--to",
+            "2026.8.2",
+            "--digest",
+            "sha256:new",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2026.6.5 -> 2026.8.2" in result.output
+    assert "DRY RUN upgrade complete" in result.output
+
+
+def test_upgrade_rejects_unpinned_new_tag(tmp_path: Path) -> None:
+    cfg, _env_file, _workspace = _write_inventory(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["upgrade", "--config", str(cfg), "--member", "one", "--to", "2026.8.2"],
+    )
+
+    assert result.exit_code == 2
+    assert "immutable --digest is required" in result.output
+
+
+def test_upgrade_execute_runs_backup_migration_and_health_checks(
+    monkeypatch: object, tmp_path: Path
+) -> None:
+    from clawake import cli
+
+    class RecordingSystemdService:
+        calls: list[str] = []
+
+        def stop(self, instance_name: str, execute: bool = False) -> CommandResult:
+            self.calls.append("stop")
+            return CommandResult(["systemctl", "stop"], 0, "", "")
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            self.calls.append("reload")
+            return CommandResult(["systemctl", "daemon-reload"], 0, "", "")
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            self.calls.append("restart")
+            return CommandResult(["systemctl", "restart"], 0, "", "")
+
+        def unit_name(self, instance_name: str) -> str:
+            return f"{instance_name}.service"
+
+    cfg, _env_file, _workspace = _write_inventory(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "SystemdService", RecordingSystemdService)
+    monkeypatch.setattr(cli, "check_image_availability", lambda image: None)
+    monkeypatch.setattr(
+        cli,
+        "run_doctor",
+        lambda instance, image: SimpleNamespace(returncode=0, stdout="ok", stderr=""),
+    )
+    monkeypatch.setattr(cli, "wait_for_health", lambda instance: (True, "health-url"))
+    monkeypatch.setattr(
+        cli,
+        "verify_runtime",
+        lambda instance, image: SimpleNamespace(
+            healthy=True,
+            version="OpenClaw 2026.8.2",
+            image_name="ghcr.io/openclaw/openclaw:2026.8.2@sha256:new",
+            error="",
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "upgrade",
+            "--config",
+            str(cfg),
+            "--member",
+            "one",
+            "--to",
+            "2026.8.2",
+            "--digest",
+            "sha256:new",
+            "--execute",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert RecordingSystemdService.calls == ["stop", "reload", "restart"]
+    assert "Upgrade complete: OpenClaw 2026.8.2" in result.output
+    assert list((tmp_path / ".backups").glob("one-*.tar.gz"))
+    image = yaml.safe_load(cfg.read_text(encoding="utf-8"))["instances"][0]["image"]
+    assert image["tag"] == "2026.8.2"
+    assert image["digest"] == "sha256:new"
+    assert image["known_good_tag"] == "2026.6.5"
 
 
 def test_setup_quadlets_dry_run_succeeds(tmp_path: Path) -> None:
