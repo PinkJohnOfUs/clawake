@@ -12,7 +12,7 @@ jobs:
   lint-test-render:
     runs-on: ubuntu-latest
     env:
-      CLAWAKE_WORKSPACE_ROOT: ${{ github.workspace }}
+      CLAWAKE_PROJECT_ROOT: ${{ github.workspace }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

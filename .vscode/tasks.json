@@ -11,7 +11,7 @@
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}"
+          "CLAWAKE_PROJECT_ROOT": "${workspaceFolder}"
         }
       },
       "problemMatcher": []

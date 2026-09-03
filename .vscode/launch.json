@@ -15,7 +15,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
-        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
+        "CLAWAKE_PROJECT_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
@@ -37,7 +37,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
-        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
+        "CLAWAKE_PROJECT_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
@@ -59,7 +59,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
-        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
+        "CLAWAKE_PROJECT_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
@@ -81,7 +81,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
-        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
+        "CLAWAKE_PROJECT_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
@@ -103,7 +103,7 @@
       "justMyCode": true,
       "python": "${workspaceFolder}/.venv/bin/python",
       "env": {
-        "CLAWAKE_WORKSPACE_ROOT": "${workspaceFolder}",
+        "CLAWAKE_PROJECT_ROOT": "${workspaceFolder}",
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
