@@ -15,6 +15,15 @@ def test_load_example_inventory() -> None:
         assert instance.team_definition_path.endswith("/role")
 
 
+def test_inventory_defaults_project_root_to_repository() -> None:
+    inventory = load_inventory(Path("personal-team/team.yml"))
+    repository_root = Path.cwd().resolve()
+
+    navigator = next(item for item in inventory.instances if item.name == "alltags-navigator")
+    assert navigator.workspace_path == str(repository_root / "personal-team/workspaces/navigator")
+    assert navigator.team_definition_path == str(repository_root / "personal-team/roles/navigator")
+
+
 def test_port_collision_validation(tmp_path: Path) -> None:
     collision = tmp_path / "collision.yaml"
     collision.write_text(
@@ -231,7 +240,7 @@ instances:
         load_inventory(cfg)
 
 
-def test_workspace_root_env_expands_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_project_root_env_expands_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     cfg = tmp_path / "env-paths.yaml"
     cfg.write_text(
         """
@@ -246,8 +255,8 @@ instances:
   - name: one
     host: a
     role: developer
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/dev
-    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/roles/dev
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/examples/workspaces/dev
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/examples/roles/dev
     quadlet_path: one.container
     container_name: one
     image: {repository: ghcr.io/x, tag: "1"}
@@ -255,12 +264,44 @@ instances:
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("CLAWAKE_WORKSPACE_ROOT", "/tmp/project")
+    monkeypatch.setenv("CLAWAKE_PROJECT_ROOT", "/tmp/project")
 
     inventory = load_inventory(cfg)
     instance = inventory.instances[0]
     assert instance.workspace_path == "/tmp/project/examples/workspaces/dev"
     assert instance.team_definition_path == "/tmp/project/examples/roles/dev"
+
+
+def test_legacy_workspace_root_env_remains_compatible(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg = tmp_path / "legacy-env-paths.yaml"
+    cfg.write_text(
+        """
+version: 1
+cluster: {name: c, mode: single_host, primary_host: a}
+hosts:
+  - {name: a}
+instances:
+  - name: one
+    host: a
+    role: developer
+    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/workspace
+    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/role
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: ghcr.io/x, tag: "1"}
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("CLAWAKE_PROJECT_ROOT", raising=False)
+    monkeypatch.setenv("CLAWAKE_WORKSPACE_ROOT", "/tmp/legacy-project")
+
+    instance = load_inventory(cfg).instances[0]
+
+    assert instance.workspace_path == "/tmp/legacy-project/workspace"
+    assert instance.team_definition_path == "/tmp/legacy-project/role"
 
 
 def test_team_definition_path_must_be_absolute(tmp_path: Path) -> None:

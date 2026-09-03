@@ -3,7 +3,7 @@ cluster:
   name: personal-support-team
   mode: single_host
   primary_host: local
-  description: Persoenliches OpenClaw-Team fuer Planung, Coaching und Fokus
+  description: Persoenliches OpenClaw-Team fuer Planung, Coaching und Pflegekoordination
 hosts:
   - name: local
     quadlet_root: ~/.config/containers/systemd
@@ -11,8 +11,8 @@ instances:
   - name: alltags-navigator
     host: local
     role: product_owner
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/personal-team/workspaces/navigator
-    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/personal-team/roles/navigator
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/navigator
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/navigator
     quadlet_path: alltags-navigator.container
     container_name: alltags-navigator
     image:
@@ -29,7 +29,7 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_WORKSPACE_ROOT}/personal-team/env/navigator.env
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/navigator.env
     labels:
       env: personal
       audience: private
@@ -49,8 +49,8 @@ instances:
   - name: reflexions-coach
     host: local
     role: product_owner
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/personal-team/workspaces/coach
-    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/personal-team/roles/coach
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/coach
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/coach
     quadlet_path: reflexions-coach.container
     container_name: reflexions-coach
     image:
@@ -67,7 +67,7 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_WORKSPACE_ROOT}/personal-team/env/coach.env
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/coach.env
     labels:
       env: personal
       audience: private
@@ -87,8 +87,8 @@ instances:
   - name: fokus-partner
     host: local
     role: developer
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/personal-team/workspaces/fokus
-    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/personal-team/roles/fokus
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/fokus
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/fokus
     quadlet_path: fokus-partner.container
     container_name: fokus-partner
     image:
@@ -105,7 +105,7 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_WORKSPACE_ROOT}/personal-team/env/fokus.env
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/fokus.env
     labels:
       env: personal
       audience: private
@@ -117,7 +117,7 @@ instances:
       pre_mutation: true
       retention: 7
     dashboard:
-      friendly_name: Fokus-Partner
+      friendly_name: Pflegebetreuer
       owner: Personal
-      description: Zerlegt Vorhaben in kleine ausfuehrbare Schritte
-      tags: [fokus, umsetzung, privat]
+      description: Koordiniert familiaere Pflege, Kommunikation und Termine
+      tags: [pflege, aok, termine, familie, privat]

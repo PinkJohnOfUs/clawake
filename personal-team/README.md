@@ -4,11 +4,14 @@ Dieses Team besteht aus drei voneinander isolierten OpenClaw-Instanzen:
 
 - **Alltags-Navigator** (`http://127.0.0.1:18789`): Tagesplanung und Priorisierung
 - **Reflexions-Coach** (`http://127.0.0.1:18889`): Coaching, Reflexion und Motivation
-- **Fokus-Partner** (`http://127.0.0.1:18989`): konkrete naechste Schritte und Fokus-Sprints
+- **Pflegebetreuer** (`http://127.0.0.1:18989`): Pflegekoordination, Schriftverkehr und Termine
 
 ## Sicherheitsmodell
 
 - Alle Ports sind nur an Loopback (`127.0.0.1`) gebunden.
+- `setup-quadlets --execute` traegt die daraus abgeleiteten lokalen Dashboard-Origins
+  idempotent in OpenClaws `gateway.controlUi.allowedOrigins` ein. Vorhandene Origins und
+  bewusst gesetzte Authentifizierungsoptionen bleiben erhalten.
 - Jede Instanz besitzt einen eigenen beschreibbaren Arbeitsbereich.
 - Rollendefinitionen werden schreibgeschuetzt eingebunden.
 - Es werden keine persoenlichen Ordner, SSH-Schluessel oder Host-Sockets gemountet.
@@ -30,7 +33,7 @@ erforderlich.
 # Auf CachyOS/Arch einmalig (auf diesem System fehlen uv und Podman noch):
 sudo pacman -S --needed uv podman
 
-export CLAWAKE_WORKSPACE_ROOT="$PWD"
+export CLAWAKE_PROJECT_ROOT="$PWD"
 make install-dev
 make doctor
 mkdir -p personal-team/env
@@ -56,10 +59,22 @@ Zum Kennenlernen zuerst nur den Navigator starten:
 uv run clawake setup-quadlets -c personal-team/team.yml -m alltags-navigator --execute
 ```
 
+Danach OpenClaws eigene interaktive Einrichtung im sandboxierten Container
+ausfuehren. Clawake gibt dabei `/workspace` als Agent-Workspace vor, behaelt die
+vorbereiteten Markdown-Dateien und verhindert eine konkurrierende
+Daemon-Installation im Container:
+
+```bash
+uv run clawake onboard-member \
+  -c personal-team/team.yml \
+  -m alltags-navigator \
+  --execute
+```
+
 ## Empfohlener Rhythmus
 
 1. Morgens dem Navigator Aufgaben, Termine, Energie und verfuegbare Zeit nennen.
-2. Fuer die wichtigste Aufgabe mit dem Fokus-Partner einen 25- oder 50-Minuten-Sprint planen.
+2. Mit dem Pflegebetreuer offene Pflegevorgaenge, Termine und Freigaben koordinieren.
 3. Abends mit dem Coach kurz auswerten: Was lief gut, was war schwer, was wird angepasst?
 
 Die Datei `workspaces/*/USER.md` kann vor dem ersten Start mit Name,

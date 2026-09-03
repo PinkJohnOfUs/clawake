@@ -10,6 +10,13 @@ import yaml
 from pydantic import BaseModel, Field, model_validator
 
 
+def _project_root_from_environment(default: str = "") -> str:
+    return os.environ.get(
+        "CLAWAKE_PROJECT_ROOT",
+        os.environ.get("CLAWAKE_WORKSPACE_ROOT", default),
+    )
+
+
 class ClusterSpec(BaseModel):
     name: str
     mode: Literal["single_host"] = "single_host"
@@ -143,7 +150,7 @@ class Inventory(BaseModel):
             expanded = os.path.expandvars(raw_path)
             expanded = expanded.replace(
                 "${workspaceFolder}",
-                os.environ.get("CLAWAKE_WORKSPACE_ROOT", ""),
+                _project_root_from_environment(),
             )
             return str(Path(expanded).expanduser())
 
@@ -276,13 +283,19 @@ def load_inventory(path: str | Path) -> Inventory:
         raise ValueError("Inventory file must contain a YAML mapping")
 
     resolved_path = inventory_path.resolve()
-    workspace_root = (
-        resolved_path.parents[2] if len(resolved_path.parents) >= 3 else resolved_path.parent
+    # Staff inventories live below the project root (for example
+    # ``personal-team/team.yml`` or ``examples/staff/team.yml``).
+    project_root = (
+        resolved_path.parents[1] if len(resolved_path.parents) >= 2 else resolved_path.parent
     )
+    configured_project_root = _project_root_from_environment(str(project_root))
     expansion_env = {
         **os.environ,
-        "workspaceFolder": os.environ.get("CLAWAKE_WORKSPACE_ROOT", str(workspace_root)),
-        "CLAWAKE_WORKSPACE_ROOT": os.environ.get("CLAWAKE_WORKSPACE_ROOT", str(workspace_root)),
+        "workspaceFolder": configured_project_root,
+        "CLAWAKE_PROJECT_ROOT": configured_project_root,
+        # Backward-compatible expansion for existing inventory files. New files
+        # should use CLAWAKE_PROJECT_ROOT because it names the value accurately.
+        "CLAWAKE_WORKSPACE_ROOT": configured_project_root,
     }
     expanded_data = _expand_string_values(data, expansion_env)
     return Inventory.model_validate(expanded_data)

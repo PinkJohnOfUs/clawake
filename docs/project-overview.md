@@ -83,8 +83,8 @@ Examples:
 - `examples/staff/team.yml`
 
 Path convention:
-- Use `${CLAWAKE_WORKSPACE_ROOT}` in staff files for repository-relative absolute paths.
-- Set `CLAWAKE_WORKSPACE_ROOT` to checkout root (VS Code: `${workspaceFolder}`, CI: `${{ github.workspace }}`).
+- Use `${CLAWAKE_PROJECT_ROOT}` in staff files for repository-relative absolute paths.
+- Set `CLAWAKE_PROJECT_ROOT` to checkout root (VS Code: `${workspaceFolder}`, CI: `${{ github.workspace }}`).
 
 ## Dashboard readiness notes
 

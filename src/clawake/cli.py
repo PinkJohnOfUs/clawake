@@ -4,12 +4,14 @@ import json
 import logging
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
 
 from clawake.config import InstanceSpec, Inventory, load_inventory
+from clawake.services.gateway_config import ensure_control_ui_config
 from clawake.services.render import render_instance_assets
 from clawake.services.systemd import CommandResult, SystemdService
 
@@ -129,6 +131,45 @@ def _dashboard_host_url(instance: InstanceSpec) -> str:
     return f"http://127.0.0.1:{host_port}/"
 
 
+@app.command("onboard-member")
+def onboard_member(
+    config: ConfigPath,
+    member: Annotated[str, typer.Option(..., "--member", "-m")],
+    execute: ExecuteFlag = False,
+) -> None:
+    """Run OpenClaw's interactive onboarding inside one managed container."""
+    inventory = _load(config)
+    instance = _instance_by_name(inventory, member)
+    command = [
+        "podman",
+        "exec",
+        "--interactive",
+        "--tty",
+        instance.container_name,
+        "openclaw",
+        "onboard",
+        "--workspace",
+        "/workspace",
+        "--skip-bootstrap",
+        "--no-install-daemon",
+    ]
+
+    typer.echo(f"Onboarding plan for member '{instance.name}':")
+    typer.echo(f"$ {' '.join(command)}")
+    if not execute:
+        typer.echo("DRY RUN onboard-member complete. Re-run with --execute to open the TUI.")
+        return
+
+    onboard_result = subprocess.run(command, check=False)
+    if onboard_result.returncode != 0:
+        raise typer.Exit(code=onboard_result.returncode or 1)
+
+    restart_result = SystemdService().restart(instance.name, execute=True)
+    _print_result(restart_result)
+    if restart_result.return_code != 0:
+        raise typer.Exit(code=1)
+
+
 @app.command("diagnose-dashboard")
 def diagnose_dashboard(
     config: ConfigPath,
@@ -242,6 +283,9 @@ def setup_quadlets(
     for instance in selected:
         runtime_state = Path(instance.workspace_path).expanduser() / ".openclaw"
         runtime_state.mkdir(parents=True, exist_ok=True)
+        gateway_config, gateway_config_changed = ensure_control_ui_config(instance)
+        if gateway_config_changed:
+            typer.echo(f"Updated local Control UI access in {gateway_config}")
 
     for _instance, rendered_file, destination in changed_artifacts:
         destination.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+set -u
+
+dashboard_url="http://127.0.0.1:18789/"
+secret_attributes=(service clawake dashboard alltags-navigator)
+
+show_error() {
+  kdialog --title "Alltags-Navigator" --error "$1"
+}
+
+gateway_is_running() {
+  systemctl --user is-active --quiet alltags-navigator.service
+}
+
+token_is_valid() {
+  local candidate="$1"
+
+  podman exec \
+    --env "CLAWAKE_DASHBOARD_TOKEN=${candidate}" \
+    alltags-navigator \
+    sh -c 'openclaw gateway health --url ws://127.0.0.1:18789 --token "$CLAWAKE_DASHBOARD_TOKEN" --timeout 5000 --json' \
+    >/dev/null 2>&1
+}
+
+prompt_for_token() {
+  kdialog --title "Alltags-Navigator" --password "Gateway-Token eingeben:" 2>/dev/null
+}
+
+if ! gateway_is_running; then
+  show_error "Der Alltags-Navigator läuft nicht. Bitte starte zuerst den Dienst."
+  exit 1
+fi
+
+token="$(secret-tool lookup "${secret_attributes[@]}" 2>/dev/null || true)"
+
+if [[ -n "$token" ]]; then
+  if token_is_valid "$token"; then
+    exec xdg-open "${dashboard_url}#token=${token}"
+  fi
+
+  secret-tool clear "${secret_attributes[@]}" >/dev/null 2>&1 || true
+  show_error "Der gespeicherte Gateway-Token ist nicht mehr gültig. Bitte gib den aktuellen Token ein."
+fi
+
+token="$(prompt_for_token)" || exit 0
+
+if [[ -z "$token" ]]; then
+  show_error "Es wurde kein Token eingegeben."
+  exit 1
+fi
+
+if [[ ! "$token" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+  show_error "Der Token enthält Zeichen, die nicht sicher in einer URL verwendet werden können."
+  exit 1
+fi
+
+if ! token_is_valid "$token"; then
+  show_error "Der eingegebene Gateway-Token wurde vom Alltags-Navigator abgelehnt."
+  exit 1
+fi
+
+if ! printf '%s' "$token" | secret-tool store \
+  --label="Alltags-Navigator Gateway-Token" \
+  "${secret_attributes[@]}" >/dev/null 2>&1; then
+  show_error "Der Token ist gültig, konnte aber nicht im Schlüsselbund gespeichert werden."
+  exit 1
+fi
+
+exec xdg-open "${dashboard_url}#token=${token}"

@@ -112,6 +112,22 @@ def test_diagnose_dashboard_show_token_url_includes_auth_fragment(tmp_path: Path
     assert "#token=sample-token" in result.output
 
 
+def test_onboard_member_dry_run_uses_managed_workspace(tmp_path: Path) -> None:
+    cfg, _env_file, _workspace = _write_inventory(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["onboard-member", "--config", str(cfg), "--member", "one"],
+    )
+
+    assert result.exit_code == 0
+    assert "podman exec --interactive --tty one openclaw onboard" in result.output
+    assert "--workspace /workspace" in result.output
+    assert "--skip-bootstrap" in result.output
+    assert "--no-install-daemon" in result.output
+    assert "DRY RUN onboard-member complete" in result.output
+
+
 def test_setup_quadlets_dry_run_succeeds(tmp_path: Path) -> None:
     cfg, _env_file, _workspace = _write_inventory(tmp_path)
 
@@ -152,6 +168,16 @@ def test_setup_quadlets_execute_deploys_files(monkeypatch: object, tmp_path: Pat
     assert (quadlet_root / "one.network").is_file()
     assert (quadlet_root / "one-state.volume").is_file()
     assert (_workspace / ".openclaw").is_dir()
+    openclaw_config = json.loads(
+        (_workspace / ".openclaw" / "openclaw.json").read_text(encoding="utf-8")
+    )
+    assert openclaw_config["gateway"]["controlUi"] == {
+        "allowedOrigins": [
+            "http://127.0.0.1:18789",
+            "http://localhost:18789",
+        ],
+        "allowInsecureAuth": True,
+    }
     assert RecordingSystemdService.daemon_reload_calls == 1
     assert RecordingSystemdService.restart_calls == 1
 
