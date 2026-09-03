@@ -21,7 +21,7 @@ Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' 
 PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
 {% endfor %}
 {% if instance.gateway_runtime.enabled %}
-Exec=openclaw gateway run --bind {{ instance.gateway_runtime.bind }} --port {{ instance.gateway_runtime.gateway_container_port }}
+Exec=openclaw gateway run --bind {{ instance.gateway_runtime.bind }} --port {{ instance.gateway_runtime.gateway_container_port }} --allow-unconfigured
 {% endif %}
 Label=clawake.instance={{ instance.name }}
 Label=clawake.role={{ instance.role }}

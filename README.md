@@ -52,7 +52,7 @@ The current lifecycle is team/member oriented and built around Quadlet reconcili
 1. Prepare environment and dependencies:
 
 	```bash
-	export CLAWAKE_WORKSPACE_ROOT="$PWD"
+	export CLAWAKE_PROJECT_ROOT="$PWD"
 	make install-dev
 	```
 
@@ -90,7 +90,9 @@ The current lifecycle is team/member oriented and built around Quadlet reconcili
 
 ### Portable staff paths
 
-`examples/staff/team.yml` uses `${CLAWAKE_WORKSPACE_ROOT}` so paths stay portable across checkouts.
+`examples/staff/team.yml` uses `${CLAWAKE_PROJECT_ROOT}` so paths stay portable across checkouts.
+The former `CLAWAKE_WORKSPACE_ROOT` name remains accepted for compatibility with existing
+inventory files and environments.
 
 ### Simplified mount model
 
@@ -102,11 +104,11 @@ The current lifecycle is team/member oriented and built around Quadlet reconcili
 For local CLI usage, set it once per shell:
 
 ```bash
-export CLAWAKE_WORKSPACE_ROOT="$PWD"
+export CLAWAKE_PROJECT_ROOT="$PWD"
 ```
 
-In VS Code launch configurations, set `CLAWAKE_WORKSPACE_ROOT` to `${workspaceFolder}`.
-In CI, set `CLAWAKE_WORKSPACE_ROOT` to the repository workspace path.
+In VS Code launch configurations, set `CLAWAKE_PROJECT_ROOT` to `${workspaceFolder}`.
+In CI, set `CLAWAKE_PROJECT_ROOT` to the repository checkout path.
 
 ### Lifecycle commands
 

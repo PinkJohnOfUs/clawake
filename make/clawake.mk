@@ -1,15 +1,15 @@
 UV ?= uv
 CONFIG ?= examples/staff/team.yml
 MEMBER ?=
-CLAWAKE_WORKSPACE_ROOT ?= $(CURDIR)
+CLAWAKE_PROJECT_ROOT ?= $(CURDIR)
 CLAWAKE_RUNTIME_ROOT ?= $(CURDIR)/.clawake/instances
 
-export CLAWAKE_WORKSPACE_ROOT
+export CLAWAKE_PROJECT_ROOT
 export CLAWAKE_RUNTIME_ROOT
 
 CLAWAKE_RUN = $(UV) run clawake
 
-.PHONY: uv-sync install-dev install-tool uninstall-tool doctor \
+.PHONY: uv-sync install-dev install-tool uninstall-tool doctor onboard-member onboard-member-exec \
 	setup-quadlets setup-quadlets-exec restart-quadlets restart-quadlets-exec \
 	teardown-quadlets teardown-quadlets-exec status-quadlets status-quadlets-json \
 	test-lifecycle test lint fmt
@@ -51,6 +51,12 @@ status-quadlets: ## Check status-quadlets in text format
 
 status-quadlets-json: ## Check status-quadlets in json format
 	$(CLAWAKE_RUN) status-quadlets -c $(CONFIG) $(if $(MEMBER),--member $(MEMBER),) --format json
+
+onboard-member: ## Preview interactive OpenClaw onboarding (requires MEMBER=<name>)
+	$(CLAWAKE_RUN) onboard-member -c $(CONFIG) --member $(MEMBER)
+
+onboard-member-exec: ## Run interactive OpenClaw onboarding (requires MEMBER=<name>)
+	$(CLAWAKE_RUN) onboard-member -c $(CONFIG) --member $(MEMBER) --execute
 
 test-lifecycle: ## Run architecture lifecycle flow (setup/restart/status/teardown); status is best-effort
 	$(MAKE) setup-quadlets CONFIG=$(CONFIG) MEMBER=$(MEMBER)

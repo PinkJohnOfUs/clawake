@@ -10,8 +10,8 @@ instances:
   - name: excalibot-product-owner
     host: solo-host
     role: product_owner
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner/workspace
-    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/product-owner/role
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/examples/workspaces/product-owner/workspace
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/examples/workspaces/product-owner/role
     quadlet_path: excalibot-product-owner.container
     container_name: excalibot-product-owner
     image:
@@ -27,7 +27,7 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_WORKSPACE_ROOT}/examples/staff/env/product-owner.env
+      - ${CLAWAKE_PROJECT_ROOT}/examples/staff/env/product-owner.env
     labels:
       env: dev
       audience: external
@@ -47,8 +47,8 @@ instances:
   - name: excalibot-developer
     host: solo-host
     role: developer
-    workspace_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer/workspace
-    team_definition_path: ${CLAWAKE_WORKSPACE_ROOT}/examples/workspaces/developer/role
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/examples/workspaces/developer/workspace
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/examples/workspaces/developer/role
     quadlet_path: excalibot-developer.container
     container_name: excalibot-developer
     image:
@@ -64,7 +64,7 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_WORKSPACE_ROOT}/examples/staff/env/developer.env
+      - ${CLAWAKE_PROJECT_ROOT}/examples/staff/env/developer.env
     labels:
       env: dev
       audience: internal

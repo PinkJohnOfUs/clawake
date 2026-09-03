@@ -1,0 +1,123 @@
+version: 1
+cluster:
+  name: personal-support-team
+  mode: single_host
+  primary_host: local
+  description: Persoenliches OpenClaw-Team fuer Planung, Coaching und Pflegekoordination
+hosts:
+  - name: local
+    quadlet_root: ~/.config/containers/systemd
+instances:
+  - name: alltags-navigator
+    host: local
+    role: product_owner
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/navigator
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/navigator
+    quadlet_path: alltags-navigator.container
+    container_name: alltags-navigator
+    image:
+      repository: ghcr.io/openclaw/openclaw
+      tag: "2026.7.1-2"
+      digest: sha256:f56744f2cbd2c2477c739158fbc4cf594300aa535767a87da3bcd9cafa150160
+    ports:
+      - bind_address: 127.0.0.1
+        host_port: 18789
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 127.0.0.1
+        host_port: 18790
+        container_port: 18790
+        protocol: tcp
+    env_files:
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/navigator.env
+    labels:
+      env: personal
+      audience: private
+    gateway_runtime:
+      enabled: true
+      bind: lan
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 7
+    dashboard:
+      friendly_name: Alltags-Navigator
+      owner: Personal
+      description: Plant den Tag und koordiniert Prioritaeten
+      tags: [planung, alltag, privat]
+
+  - name: reflexions-coach
+    host: local
+    role: product_owner
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/coach
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/coach
+    quadlet_path: reflexions-coach.container
+    container_name: reflexions-coach
+    image:
+      repository: ghcr.io/openclaw/openclaw
+      tag: "2026.7.1-2"
+      digest: sha256:f56744f2cbd2c2477c739158fbc4cf594300aa535767a87da3bcd9cafa150160
+    ports:
+      - bind_address: 127.0.0.1
+        host_port: 18889
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 127.0.0.1
+        host_port: 18890
+        container_port: 18790
+        protocol: tcp
+    env_files:
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/coach.env
+    labels:
+      env: personal
+      audience: private
+    gateway_runtime:
+      enabled: true
+      bind: lan
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 7
+    dashboard:
+      friendly_name: Reflexions-Coach
+      owner: Personal
+      description: Coacht wertschatzend und motiviert ohne Druck
+      tags: [coaching, reflexion, motivation]
+
+  - name: fokus-partner
+    host: local
+    role: developer
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/fokus
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/fokus
+    quadlet_path: fokus-partner.container
+    container_name: fokus-partner
+    image:
+      repository: ghcr.io/openclaw/openclaw
+      tag: "2026.7.1-2"
+      digest: sha256:f56744f2cbd2c2477c739158fbc4cf594300aa535767a87da3bcd9cafa150160
+    ports:
+      - bind_address: 127.0.0.1
+        host_port: 18989
+        container_port: 18789
+        protocol: tcp
+      - bind_address: 127.0.0.1
+        host_port: 18990
+        container_port: 18790
+        protocol: tcp
+    env_files:
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/fokus.env
+    labels:
+      env: personal
+      audience: private
+    gateway_runtime:
+      enabled: true
+      bind: lan
+    backup_policy:
+      enabled: true
+      pre_mutation: true
+      retention: 7
+    dashboard:
+      friendly_name: Pflegebetreuer
+      owner: Personal
+      description: Koordiniert familiaere Pflege, Kommunikation und Termine
+      tags: [pflege, aok, termine, familie, privat]
