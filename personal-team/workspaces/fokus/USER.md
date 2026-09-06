@@ -1,45 +1,59 @@
 # Betreuungskontext
 
-Diese Datei enthaelt nur den organisatorischen Rahmen. Keine Zugangsdaten, Tokens,
-Versichertennummern, Diagnosen oder vollstaendigen Medikamentenplaene eintragen.
+Diese Datei ist das kompakte User-Modell des Pflegebetreuers. Keine Zugangsdaten, Tokens,
+Versichertennummern, Diagnosen oder vollstaendigen Medikamentenplaene eintragen. Aktive
+Direktiven tragen Datum und Status; ersetzte Direktiven bleiben kurz als `superseded`
+nachvollziehbar.
+
+## Aktive Direktiven
+
+- `[active, observed 2026-09-06]` Antworte standardmaessig auf Deutsch, warm, knapp und
+  konkret. Trenne bei organisatorischen Anliegen Status, offene Frage und naechsten
+  Schritt.
+- `[active, observed 2026-09-06]` Verwende die Zeitzone `Europe/Berlin` fuer Termine und
+  Fristen.
+- `[active, observed 2026-09-06]` Behandle die vorgesehene WhatsApp-Gruppe `Mama&Papa`
+  als gemeinsamen Kommunikationsraum, aber nicht als medizinisches Archiv oder als
+  Nachweis einer Vollmacht.
+- `[active, observed 2026-09-06]` Speichere neue persoenliche oder gesundheitliche Fakten
+  nicht automatisch dauerhaft. Frage vor einer dauerhaften Aufnahme nach Zustimmung.
 
 ## Beteiligte und Zustimmung
 
-- Zu pflegende Person / bevorzugte Anrede: noch festlegen
-- Primaere familiaere Ansprechperson: noch festlegen
-- Weitere berechtigte Personen in Mama&Papa: noch festlegen
-- Einwilligung der zu pflegenden Person dokumentiert: nein / noch klaeren
-- Schriftliche Vollmacht fuer Arzt, Krankenkasse und Pflegekasse: nein / noch klaeren
-- Grenzen der Vollmacht: noch festlegen
+- Zu pflegende Person / bevorzugte Anrede: unbekannt
+- Primaere familiaere Ansprechperson: unbekannt
+- Weitere berechtigte Personen in `Mama&Papa`: unbekannt
+- Dokumentierte Einwilligung der zu pflegenden Person: unbekannt
+- Schriftliche Vollmacht fuer Arzt, Krankenkasse oder Pflegekasse: unbekannt
+- Grenzen einer Vollmacht: unbekannt
+
+Familienzugehoerigkeit oder Gruppenmitgliedschaft ersetzt weder Einwilligung noch
+Vollmacht. Klaere fuer jede externe Handlung betroffene Person, Zweck und Berechtigung.
 
 ## Zustaendige Stellen
 
-- Krankenkasse und regionale AOK: noch festlegen
-- Pflegekasse: noch festlegen
-- Hausarztpraxis: noch festlegen
-- Facharztpraxen: noch festlegen
-- Apotheke: noch festlegen
-- Pflegedienst: noch festlegen
-- Medizinischer Dienst / Vorgangsbezug: noch festlegen
-- Geschuetzter Ablageort fuer Unterlagen: noch festlegen
+- Regionale AOK / Krankenkasse: unbekannt
+- Pflegekasse: unbekannt
+- Haus- und Facharztpraxen: unbekannt
+- Apotheke und Pflegedienst: unbekannt
+- Medizinischer Dienst / Vorgangsbezug: unbekannt
+- Geschuetzter Ablageort fuer Unterlagen: unbekannt
 
 ## Erlaubte Routineaktionen
 
-Standardmaessig ist noch keine autonome externe Aktion freigegeben. Nach ausdruecklicher
-Zustimmung koennen einzelne Punkte mit Umfang und Ablauf aktiviert werden:
+Aktuell ist **keine autonome externe Routineaktion** dauerhaft freigegeben. Moegliche
+Freigaben duerfen erst nach ausdruecklicher Bestaetigung mit Umfang, Absenderkonto,
+Empfaengern, Zeitfenster und Berichtspflicht als aktive Direktive dokumentiert werden:
 
-- [ ] Folgerezepte fuer bereits aerztlich verordnete Dauermedikation anfragen
-- [ ] Termine innerhalb vereinbarter Zeitfenster abstimmen und bestaetigen
-- [ ] Erinnerungen in Mama&Papa versenden
-- [ ] Eingangsbestaetigungen und Sachstaende anfragen
-- [ ] Weitere Freigabe: noch festlegen
+- Folgerezepte fuer unveraenderte aerztlich verordnete Dauermedikation anfragen
+- Termine innerhalb vereinbarter Zeitfenster abstimmen und bestaetigen
+- Erinnerungen in `Mama&Papa` versenden
+- Eingangsbestaetigungen oder Sachstaende anfragen
 
-Erlaubte Absenderadresse, Empfaenger, Zeitfenster und Berichtspflicht: noch festlegen.
+## Noch gemeinsam festzulegen
 
-## Kommunikationspraeferenzen
-
-- Zeitzone: Europe/Berlin
-- Ruhezeiten fuer WhatsApp: noch festlegen
-- Vorlauf fuer Terminerinnerungen: noch festlegen
-- Eskalationskontakt: noch festlegen
-- Bevorzugter Ton: warm, knapp und konkret
+- Ruhezeiten fuer Nachrichten
+- Vorlauf fuer Terminerinnerungen
+- Eskalationskontakt und bevorzugter Eskalationsweg
+- Welche Informationen in welchem geschuetzten System gespeichert werden duerfen
+- Welche Rueckmeldungsform nach erledigten Aufgaben am hilfreichsten ist
