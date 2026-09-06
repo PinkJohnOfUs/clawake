@@ -12,7 +12,7 @@ import typer
 
 from clawake.config import ImageSpec, InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance, prune_backups
-from clawake.services.gateway_config import ensure_control_ui_config
+from clawake.services.gateway_config import ensure_control_ui_config, ensure_workspace_config
 from clawake.services.image_check import ImageCheckError, check_image_availability
 from clawake.services.render import render_instance_assets
 from clawake.services.runtime_upgrade import (
@@ -238,6 +238,7 @@ def upgrade_member(
         config_changed = True
         updated_inventory = _load(config)
         updated_instance = _instance_by_name(updated_inventory, member)
+        ensure_workspace_config(updated_instance)
         ensure_control_ui_config(updated_instance)
         for deployed in _deploy_instance_assets(updated_instance, updated_inventory):
             typer.echo(f"Deployed {deployed}")
@@ -320,6 +321,10 @@ def onboard_member(
     onboard_result = subprocess.run(command, check=False)
     if onboard_result.returncode != 0:
         raise typer.Exit(code=onboard_result.returncode or 1)
+
+    workspace_config, workspace_changed = ensure_workspace_config(instance)
+    if workspace_changed:
+        typer.echo(f"Configured managed agent workspace in {workspace_config}")
 
     restart_result = SystemdService().restart(instance.name, execute=True)
     _print_result(restart_result)
@@ -442,6 +447,9 @@ def setup_quadlets(
         runtime_state.mkdir(parents=True, exist_ok=True)
         if is_browser_image(instance.image):
             ensure_browser_cache(instance)
+        workspace_config, workspace_config_changed = ensure_workspace_config(instance)
+        if workspace_config_changed:
+            typer.echo(f"Configured managed agent workspace in {workspace_config}")
         gateway_config, gateway_config_changed = ensure_control_ui_config(instance)
         if gateway_config_changed:
             typer.echo(f"Updated local Control UI access in {gateway_config}")

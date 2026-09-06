@@ -277,6 +277,7 @@ def test_setup_quadlets_execute_deploys_files(monkeypatch: object, tmp_path: Pat
     openclaw_config = json.loads(
         (_workspace / ".openclaw" / "openclaw.json").read_text(encoding="utf-8")
     )
+    assert openclaw_config["agents"]["defaults"]["workspace"] == "/workspace"
     assert openclaw_config["gateway"]["controlUi"] == {
         "allowedOrigins": [
             "http://127.0.0.1:18789",

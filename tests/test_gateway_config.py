@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 
 from clawake.config import load_inventory
-from clawake.services.gateway_config import ensure_control_ui_config
+from clawake.services.gateway_config import ensure_control_ui_config, ensure_workspace_config
 
 
 def _instance(tmp_path: Path, *, bind_address: str = "127.0.0.1"):
@@ -71,6 +71,55 @@ def test_creates_minimal_local_control_ui_config(tmp_path: Path) -> None:
         }
     }
     assert config_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_configures_managed_agent_workspace(tmp_path: Path) -> None:
+    instance = _instance(tmp_path)
+
+    config_path, changed = ensure_workspace_config(instance)
+
+    assert changed is True
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    assert payload == {"agents": {"defaults": {"workspace": "/workspace"}}}
+    assert config_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_workspace_config_repairs_stale_default_and_preserves_agent_entries(
+    tmp_path: Path,
+) -> None:
+    instance = _instance(tmp_path)
+    config_path = Path(instance.workspace_path) / ".openclaw" / "openclaw.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "agents": {
+                    "defaults": {"workspace": "/home/node/.openclaw/workspace"},
+                    "entries": {"main": {}},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _, changed = ensure_workspace_config(instance)
+
+    assert changed is True
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    assert payload["agents"] == {
+        "defaults": {"workspace": "/workspace"},
+        "entries": {"main": {}},
+    }
+
+
+def test_workspace_config_is_idempotent(tmp_path: Path) -> None:
+    instance = _instance(tmp_path)
+
+    _, first_changed = ensure_workspace_config(instance)
+    _, second_changed = ensure_workspace_config(instance)
+
+    assert first_changed is True
+    assert second_changed is False
 
 
 def test_merges_origins_without_overwriting_existing_settings(tmp_path: Path) -> None:

@@ -8,7 +8,8 @@
 
 ## Pflegehinweis
 
-Nur langlebige, bestaetigte Entscheidungen und verdichtete Erkenntnisse aufnehmen. Keine
-Rohtranskripte, Zugangsdaten oder detaillierten Gesundheits- und Versicherungsdaten
-speichern. Veraltete Eintraege als `superseded` markieren oder auf ausdruecklichen Wunsch
-entfernen.
+Diese Datei ist versioniert. Nur langlebige, bestaetigte und nicht personenbezogene
+Entscheidungen sowie verdichtete Arbeitsmuster aufnehmen. Keine Namen, Kontaktdaten,
+Rohtranskripte, Zugangsdaten, privaten Schluessel, Gesundheits-, Medikations-, Vollmachts-
+oder Versicherungsdaten speichern. Veraltete Eintraege als `superseded` markieren oder
+auf ausdruecklichen Wunsch entfernen.

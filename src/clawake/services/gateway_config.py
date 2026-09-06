@@ -7,6 +7,27 @@ from pathlib import Path
 from clawake.config import InstanceSpec
 
 _LOOPBACK_ADDRESSES = {"127.0.0.1", "::1", "localhost"}
+_MANAGED_WORKSPACE = "/workspace"
+
+
+def _load_config(config_path: Path) -> dict[str, object]:
+    if not config_path.exists():
+        return {}
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid OpenClaw config '{config_path}': {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"OpenClaw config '{config_path}' must contain a JSON object")
+    return payload
+
+
+def _write_config(config_path: Path, payload: dict[str, object]) -> None:
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = config_path.with_suffix(".json.clawake-tmp")
+    temporary_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    os.chmod(temporary_path, 0o600)
+    temporary_path.replace(config_path)
 
 
 def _format_origin_host(address: str) -> str:
@@ -29,6 +50,26 @@ def local_control_ui_origins(instance: InstanceSpec) -> list[str]:
     return list(dict.fromkeys(origins))
 
 
+def ensure_workspace_config(instance: InstanceSpec) -> tuple[Path, bool]:
+    """Make the workspace mounted by Clawake OpenClaw's default agent workspace."""
+    config_path = Path(instance.workspace_path).expanduser() / ".openclaw" / "openclaw.json"
+    payload = _load_config(config_path)
+
+    agents = payload.setdefault("agents", {})
+    if not isinstance(agents, dict):
+        raise ValueError(f"OpenClaw config '{config_path}': agents must be an object")
+    defaults = agents.setdefault("defaults", {})
+    if not isinstance(defaults, dict):
+        raise ValueError(f"OpenClaw config '{config_path}': agents.defaults must be an object")
+
+    if defaults.get("workspace") == _MANAGED_WORKSPACE:
+        return config_path, False
+
+    defaults["workspace"] = _MANAGED_WORKSPACE
+    _write_config(config_path, payload)
+    return config_path, True
+
+
 def ensure_control_ui_config(instance: InstanceSpec) -> tuple[Path, bool]:
     """Merge inferred local Control UI settings into OpenClaw's persisted config."""
     config_path = Path(instance.workspace_path).expanduser() / ".openclaw" / "openclaw.json"
@@ -36,15 +77,7 @@ def ensure_control_ui_config(instance: InstanceSpec) -> tuple[Path, bool]:
     if not instance.gateway_runtime.enabled or not origins:
         return config_path, False
 
-    if config_path.exists():
-        try:
-            payload = json.loads(config_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid OpenClaw config '{config_path}': {exc}") from exc
-        if not isinstance(payload, dict):
-            raise ValueError(f"OpenClaw config '{config_path}' must contain a JSON object")
-    else:
-        payload = {}
+    payload = _load_config(config_path)
 
     gateway = payload.setdefault("gateway", {})
     if not isinstance(gateway, dict):
@@ -86,9 +119,5 @@ def ensure_control_ui_config(instance: InstanceSpec) -> tuple[Path, bool]:
     if not changed:
         return config_path, False
 
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = config_path.with_suffix(".json.clawake-tmp")
-    temporary_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    os.chmod(temporary_path, 0o600)
-    temporary_path.replace(config_path)
+    _write_config(config_path, payload)
     return config_path, True

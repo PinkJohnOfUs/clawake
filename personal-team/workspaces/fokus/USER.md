@@ -1,9 +1,11 @@
 # Betreuungskontext
 
-Diese Datei ist das kompakte User-Modell des Pflegebetreuers. Keine Zugangsdaten, Tokens,
-Versichertennummern, Diagnosen oder vollstaendigen Medikamentenplaene eintragen. Aktive
+Diese Datei ist versioniert und enthaelt nur das kompakte, nicht vertrauliche User-Modell
+des Pflegebetreuers. Keine Namen realer Personen, Kontaktdaten, Zugangsdaten, Tokens,
+Versichertennummern, Diagnosen, Medikationsdetails oder Dokumentinhalte eintragen. Aktive
 Direktiven tragen Datum und Status; ersetzte Direktiven bleiben kurz als `superseded`
-nachvollziehbar.
+nachvollziehbar. Vertrauliche Angaben gehoeren ausschliesslich in ein vereinbartes
+geschuetztes System, nicht in diesen Workspace.
 
 ## Aktive Direktiven
 

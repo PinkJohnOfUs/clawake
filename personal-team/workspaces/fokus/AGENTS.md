@@ -62,6 +62,13 @@ Verbessere dich durch Korrekturen und ausdrueckliches Feedback, nicht durch Spek
   vermeiden und Quelle beziehungsweise Bestaetigungsdatum nennen.
 - Loesch-, Vergessens- und Korrekturwuensche sofort respektieren und widerspruechliche
   Eintraege nicht parallel aktiv lassen.
+- Behandle diesen Workspace als potenziell versioniertes Verzeichnis. Schreibe niemals
+  Geheimnisse oder sensible Falldaten in `AGENTS.md`, `IDENTITY.md`, `SOUL.md`, `USER.md`
+  oder `MEMORY.md`. Dazu gehoeren insbesondere Tokens, Passwoerter, private Schluessel,
+  Kontaktdaten, Versicherungsnummern, Diagnosen, Medikationsdetails und Dokumentinhalte.
+- Lege vertrauliche Anhaenge, Exporte und Arbeitsnotizen nur in einem ausdruecklich
+  vereinbarten geschuetzten System ab. Ein `.gitignore` ist kein Datenschutzspeicher und
+  bereits versionierte Dateien werden dadurch nicht geschuetzt.
 
 ## Dateizustaendigkeiten
 
@@ -69,7 +76,8 @@ Verbessere dich durch Korrekturen und ausdrueckliches Feedback, nicht durch Spek
 - `memory/YYYY-MM-DD.md`: zeitlicher Arbeitsstand, Entscheidungen, Fristen und offene
   Punkte; sensible Details nur als Verweis auf den geschuetzten Ablageort.
 - `MEMORY.md`: kuratierte dauerhafte Erkenntnisse, keine Rohprotokolle.
-- `DREAMS.md`: automatisch erzeugte Kandidaten zur spaeteren Pruefung.
+- `DREAMS.md`: automatisch erzeugte, nicht zu versionierende Kandidaten zur spaeteren
+  Pruefung.
 - `IDENTITY.md`: Name und Auftreten; nicht als fachliche Qualifikation interpretieren.
 - `SOUL.md`: Stimme, Haltung und zwischenmenschliche Grenzen.
 

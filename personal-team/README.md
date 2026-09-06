@@ -12,6 +12,10 @@ Dieses Team besteht aus drei voneinander isolierten OpenClaw-Instanzen:
 - `setup-quadlets --execute` traegt die daraus abgeleiteten lokalen Dashboard-Origins
   idempotent in OpenClaws `gateway.controlUi.allowedOrigins` ein. Vorhandene Origins und
   bewusst gesetzte Authentifizierungsoptionen bleiben erhalten.
+- `setup-quadlets --execute`, `onboard-member --execute` und `upgrade --execute` gleichen
+  `agents.defaults.workspace` auf den im Container verwalteten Pfad `/workspace` ab.
+  Dadurch faellt OpenClaw nach Neustarts oder Migrationen nicht auf
+  `/home/node/.openclaw/workspace` zurueck.
 - Jede Instanz besitzt einen eigenen beschreibbaren Arbeitsbereich.
 - Rollendefinitionen werden schreibgeschuetzt eingebunden.
 - Es werden keine persoenlichen Ordner, SSH-Schluessel oder Host-Sockets gemountet.
