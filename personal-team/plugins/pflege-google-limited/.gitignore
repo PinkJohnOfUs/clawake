@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tgz
+!releases/
+!releases/*.tgz
+*.log
+
+# OAuth material never belongs in the source tree.
+*credentials*.json
+*token*.json
+client_secret*.json

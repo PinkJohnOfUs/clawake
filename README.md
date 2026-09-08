@@ -80,6 +80,7 @@ accept `--member/-m <name>` to limit their scope.
 | `onboard -m NAME` | Preview or run interactive OpenClaw onboarding |
 | `dashboard [--format json]` | Show local dashboard URLs and token presence |
 | `upgrade -m NAME --to TAG --digest sha256:…` | Preview or perform a pinned image upgrade |
+| `sync-plugins -m NAME` | Verify and install digest-pinned plugins declared in inventory |
 | `teardown` | Preview or remove selected containers and Quadlets |
 
 Add `--execute` to apply `setup`, `restart`, `onboard`, `upgrade` or `teardown`.

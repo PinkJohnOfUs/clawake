@@ -1,0 +1,55 @@
+{
+  "name": "@clawake/pflege-google-limited",
+  "version": "0.5.0",
+  "description": "Limited Google Gmail, Calendar, and read-only Drive tools for OpenClaw using native Node fetch and fs.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "google",
+    "gmail",
+    "calendar",
+    "drive",
+    "oauth"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "plugin:build": "npm run build && openclaw plugins build --root . --entry ./dist/index.js",
+    "plugin:check": "npm run build && openclaw plugins build --root . --entry ./dist/index.js --check",
+    "plugin:validate": "openclaw plugins validate --root . --entry ./dist/index.js --json",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "SETUP.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=2026.9.2"
+  },
+  "dependencies": {
+    "typebox": "^1.1.38"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "openclaw": "2026.9.2",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.5.22"
+    },
+    "build": {
+      "openclawVersion": "2026.9.2"
+    }
+  }
+}

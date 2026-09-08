@@ -36,6 +36,11 @@ def test_render_includes_explicit_dns_servers() -> None:
     rendered = render_instance(instance, template_root=Path("templates"))
 
     assert "DNS=192.168.2.1" in rendered
+    assert (
+        "Volume="
+        f"{instance.plugins[0].artifact_path}:"
+        "/opt/clawake/plugins/pflege-google-limited.tgz:ro"
+    ) in rendered
 
 
 def test_render_assets_include_container_network_and_volume() -> None:

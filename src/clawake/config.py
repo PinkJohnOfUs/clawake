@@ -52,6 +52,19 @@ class MountSpec(BaseModel):
     read_only: bool = False
 
 
+class PluginSpec(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
+    artifact_path: str
+    sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    config: dict[str, str | bool | int] = Field(default_factory=dict)
+    enabled: bool = True
+    custom_ui: bool = False
+
+    @property
+    def container_path(self) -> str:
+        return f"/opt/clawake/plugins/{self.id}.tgz"
+
+
 class HealthSpec(BaseModel):
     path: str = "/health"
     interval_seconds: int = 30
@@ -98,6 +111,7 @@ class InstanceSpec(BaseModel):
     image: ImageSpec
     ports: list[PortSpec] = Field(default_factory=list)
     mounts: list[MountSpec] = Field(default_factory=list)
+    plugins: list[PluginSpec] = Field(default_factory=list)
     env_files: list[str] = Field(default_factory=list)
     dns_servers: list[str] = Field(default_factory=list)
     labels: dict[str, str] = Field(default_factory=dict)
@@ -230,6 +244,21 @@ class Inventory(BaseModel):
                     f"instances[{instance.name}].mounts.target",
                     mount.target,
                 )
+            plugin_ids: set[str] = set()
+            for plugin in instance.plugins:
+                if plugin.id in plugin_ids:
+                    raise ValueError(
+                        f"Instance '{instance.name}' contains duplicate plugin '{plugin.id}'"
+                    )
+                plugin_ids.add(plugin.id)
+                artifact = _validate_safe_absolute_path(
+                    f"instances[{instance.name}].plugins[{plugin.id}].artifact_path",
+                    plugin.artifact_path,
+                )
+                if not artifact.endswith(".tgz"):
+                    raise ValueError(
+                        f"Plugin artifact for '{plugin.id}' must end with '.tgz'"
+                    )
 
             if instance.gateway_runtime.enabled:
                 expected = {

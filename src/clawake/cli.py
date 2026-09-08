@@ -14,6 +14,7 @@ from clawake.services.backup import backup_instance, prune_backups
 from clawake.services.deployment import apply_artifacts, plan_deployment
 from clawake.services.gateway_config import ensure_control_ui_config, ensure_workspace_config
 from clawake.services.image_check import ImageCheckError, check_image_availability
+from clawake.services.plugins import sync_plugin
 from clawake.services.runtime_upgrade import (
     doctor_command,
     ensure_browser_cache,
@@ -72,6 +73,61 @@ def _select_instances(inventory: Inventory, member: str | None) -> list[Instance
     if member is None:
         return list(inventory.instances)
     return [_instance_by_name(inventory, member)]
+
+
+@app.command("sync-plugins")
+def sync_plugins(
+    config: ConfigPath,
+    member: OptionalMemberName = None,
+    execute: ExecuteFlag = False,
+) -> None:
+    """Verify and install digest-pinned OpenClaw plugins declared in the inventory."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    declared = [(instance, plugin) for instance in selected for plugin in instance.plugins]
+    if not declared:
+        typer.echo("No managed plugins declared for the selected member(s).")
+        return
+
+    typer.echo(f"Plugin sync plan for {len(declared)} pinned plugin(s)")
+    plans = []
+    try:
+        for instance, plugin in declared:
+            result = sync_plugin(instance, plugin, execute=False)
+            plans.append((instance, plugin, result))
+            typer.echo(f" - {instance.name}: {plugin.id} ({result.digest})")
+            typer.echo(f"   mount: {plugin.artifact_path} -> {plugin.container_path}:ro")
+    except (OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    if not execute:
+        typer.echo(
+            "DRY RUN sync-plugins complete. Run setup --execute first when the Quadlet "
+            "mount is new or changed, then re-run with --execute."
+        )
+        return
+
+    service = SystemdService()
+    failed = False
+    for instance, plugin, _result in plans:
+        try:
+            result = sync_plugin(instance, plugin, execute=True)
+            for command in result.commands:
+                displayed = list(command)
+                if len(displayed) >= 2 and displayed[-2].endswith(".config"):
+                    displayed[-1] = "<redacted-plugin-config>"
+                typer.echo(f"$ {' '.join(displayed)}")
+            typer.echo(f"Installed verified plugin {plugin.id} on {instance.name}")
+        except (OSError, RuntimeError, ValueError) as exc:
+            typer.echo(str(exc), err=True)
+            failed = True
+            continue
+        restart_result = service.restart(instance.name, execute=True)
+        _print_result(restart_result)
+        failed = failed or restart_result.return_code != 0
+    if failed:
+        raise typer.Exit(code=1)
 
 
 def _print_result(result: CommandResult) -> None:

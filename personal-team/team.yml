@@ -114,6 +114,16 @@ instances:
     # forward reliably from its network namespace. Use the LAN resolver directly.
     dns_servers:
       - 192.168.2.1
+    plugins:
+      - id: pflege-google-limited
+        artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-google-limited/releases/pflege-google-limited-0.5.0-openclaw-2026.9.2.tgz
+        sha256: sha256:9089f446331e93cee7ba786800621573f2bfc9b50bfe319e6749787341dc1d4e
+        enabled: true
+        custom_ui: true
+        config:
+          credentialsPath: /home/node/.openclaw/secrets/pflege-google-web-credentials.json
+          tokenPath: /home/node/.openclaw/secrets/pflege-google-web-token.json
+          publicOrigin: http://127.0.0.1:18989
     labels:
       env: personal
       audience: private

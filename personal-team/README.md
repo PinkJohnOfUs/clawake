@@ -58,6 +58,36 @@ uv run clawake status-quadlets -c personal-team/team.yml
 uv run clawake diagnose-dashboard -c personal-team/team.yml
 ```
 
+## Verwaltetes Google-Plugin
+
+Der Quellcode von `pflege-google-limited` liegt versionierbar unter
+`personal-team/plugins/pflege-google-limited`. Das Inventar pinnt das gebaute Archiv
+mit SHA-256 für den Fokus-Partner. Google-Credentials und Tokens bleiben ausschließlich
+im ignorierten Laufzeitverzeichnis `workspaces/fokus/.openclaw/secrets`.
+
+Nach einer Quellcodeänderung das Plugin gemäß seiner README bauen und testen, das neue
+Archiv und dessen SHA-256 im Inventar prüfen und anschließend erst Quadlet und Plugin
+anwenden:
+
+```bash
+uv run clawake setup -c personal-team/team.yml -m fokus-partner
+uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner
+uv run clawake setup -c personal-team/team.yml -m fokus-partner --execute
+uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner --execute
+```
+
+`setup` bindet ausschließlich das gepinnte Archiv schreibgeschützt in den Container.
+`sync-plugins` prüft zuerst den Host-Digest, installiert genau dieses Archiv, setzt die
+Prüfsumme des tatsächlichen Read-only-Mounts erneut, setzt die deklarierte
+Plugin-Konfiguration ohne Ausgabe ihres Inhalts und startet die Instanz neu. Das Akzeptieren der im
+Archiv deklarierten Fähigkeiten ist damit an den geprüften Digest im Inventar gebunden.
+
+In `plugins[].config` gehören nur nicht geheime Werte oder Verweise auf OpenClaw-
+Secrets, niemals Token oder Passwörter. Das Git-Repository sichert Quellcode und
+Deployment-Rezept. Die Dateien unter `.openclaw/secrets` benötigen unabhängig davon
+eine verschlüsselte, zugriffsgeschützte Sicherung; sie werden bewusst nicht in Git
+aufgenommen.
+
 Zum Kennenlernen zuerst nur den Navigator starten:
 
 ```bash
