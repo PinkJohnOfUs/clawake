@@ -54,15 +54,51 @@ class MountSpec(BaseModel):
 
 class PluginSpec(BaseModel):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
-    artifact_path: str
-    sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    artifact_path: str | None = None
+    sha256: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    npm_spec: str | None = None
+    integrity: str | None = Field(default=None, pattern=r"^sha512-[A-Za-z0-9+/]+={0,2}$")
     config: dict[str, str | bool | int] = Field(default_factory=dict)
     enabled: bool = True
     custom_ui: bool = False
 
+    @model_validator(mode="after")
+    def validate_source(self) -> PluginSpec:
+        archive_fields = (self.artifact_path, self.sha256)
+        npm_fields = (self.npm_spec, self.integrity)
+        has_archive = any(value is not None for value in archive_fields)
+        has_npm = any(value is not None for value in npm_fields)
+        if has_archive == has_npm:
+            raise ValueError(
+                "plugin must declare exactly one source: artifact_path + sha256 or "
+                "npm_spec + integrity"
+            )
+        if has_archive and not all(value is not None for value in archive_fields):
+            raise ValueError("archive plugins require artifact_path and sha256")
+        if has_npm and not all(value is not None for value in npm_fields):
+            raise ValueError("npm plugins require npm_spec and integrity")
+        if self.npm_spec and not re.fullmatch(
+            r"(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*@"
+            r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?",
+            self.npm_spec,
+        ):
+            raise ValueError("npm_spec must contain an exact package version")
+        return self
+
+    @property
+    def source_type(self) -> Literal["archive", "npm"]:
+        return "archive" if self.artifact_path is not None else "npm"
+
     @property
     def container_path(self) -> str:
         return f"/opt/clawake/plugins/{self.id}.tgz"
+
+    @property
+    def install_target(self) -> str:
+        if self.source_type == "archive":
+            return self.container_path
+        assert self.npm_spec is not None
+        return f"npm:{self.npm_spec}"
 
 
 class HealthSpec(BaseModel):
@@ -251,14 +287,13 @@ class Inventory(BaseModel):
                         f"Instance '{instance.name}' contains duplicate plugin '{plugin.id}'"
                     )
                 plugin_ids.add(plugin.id)
-                artifact = _validate_safe_absolute_path(
-                    f"instances[{instance.name}].plugins[{plugin.id}].artifact_path",
-                    plugin.artifact_path,
-                )
-                if not artifact.endswith(".tgz"):
-                    raise ValueError(
-                        f"Plugin artifact for '{plugin.id}' must end with '.tgz'"
+                if plugin.artifact_path is not None:
+                    artifact = _validate_safe_absolute_path(
+                        f"instances[{instance.name}].plugins[{plugin.id}].artifact_path",
+                        plugin.artifact_path,
                     )
+                    if not artifact.endswith(".tgz"):
+                        raise ValueError(f"Plugin artifact for '{plugin.id}' must end with '.tgz'")
 
             if instance.gateway_runtime.enabled:
                 expected = {

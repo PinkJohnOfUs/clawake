@@ -81,7 +81,7 @@ def sync_plugins(
     member: OptionalMemberName = None,
     execute: ExecuteFlag = False,
 ) -> None:
-    """Verify and install digest-pinned OpenClaw plugins declared in the inventory."""
+    """Verify and install integrity-pinned OpenClaw plugins from the inventory."""
     inventory = _load(config)
     selected = _select_instances(inventory, member)
     declared = [(instance, plugin) for instance in selected for plugin in instance.plugins]
@@ -96,20 +96,24 @@ def sync_plugins(
             result = sync_plugin(instance, plugin, execute=False)
             plans.append((instance, plugin, result))
             typer.echo(f" - {instance.name}: {plugin.id} ({result.digest})")
-            typer.echo(f"   mount: {plugin.artifact_path} -> {plugin.container_path}:ro")
+            if plugin.source_type == "archive":
+                typer.echo(f"   mount: {plugin.artifact_path} -> {plugin.container_path}:ro")
+            else:
+                typer.echo(f"   npm: {plugin.npm_spec}")
     except (OSError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
 
     if not execute:
         typer.echo(
-            "DRY RUN sync-plugins complete. Run setup --execute first when the Quadlet "
+            "DRY RUN sync-plugins complete. Run setup --execute first when an archive "
             "mount is new or changed, then re-run with --execute."
         )
         return
 
     service = SystemdService()
     failed = False
+    restart_instances: dict[str, InstanceSpec] = {}
     for instance, plugin, _result in plans:
         try:
             result = sync_plugin(instance, plugin, execute=True)
@@ -119,10 +123,12 @@ def sync_plugins(
                     displayed[-1] = "<redacted-plugin-config>"
                 typer.echo(f"$ {' '.join(displayed)}")
             typer.echo(f"Installed verified plugin {plugin.id} on {instance.name}")
+            restart_instances[instance.name] = instance
         except (OSError, RuntimeError, ValueError) as exc:
             typer.echo(str(exc), err=True)
             failed = True
             continue
+    for instance in restart_instances.values():
         restart_result = service.restart(instance.name, execute=True)
         _print_result(restart_result)
         failed = failed or restart_result.return_code != 0

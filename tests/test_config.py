@@ -49,11 +49,14 @@ def test_inventory_defaults_project_root_to_repository() -> None:
     assert navigator.team_definition_path == str(repository_root / "personal-team/roles/navigator")
 
     fokus = next(item for item in inventory.instances if item.name == "fokus-partner")
-    plugin = fokus.plugins[0]
+    whatsapp = next(item for item in fokus.plugins if item.id == "whatsapp")
+    assert whatsapp.source_type == "npm"
+    assert whatsapp.npm_spec == "@openclaw/whatsapp@2026.9.2"
+
+    plugin = next(item for item in fokus.plugins if item.id == "pflege-google-limited")
     assert plugin.id == "pflege-google-limited"
     assert plugin.artifact_path == str(
-        repository_root
-        / "personal-team/plugins/pflege-google-limited/releases/"
+        repository_root / "personal-team/plugins/pflege-google-limited/releases/"
         "pflege-google-limited-0.5.0-openclaw-2026.9.2.tgz"
     )
     assert plugin.container_path == "/opt/clawake/plugins/pflege-google-limited.tgz"

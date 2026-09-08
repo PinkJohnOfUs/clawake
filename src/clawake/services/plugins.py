@@ -25,6 +25,11 @@ def artifact_digest(path: str | Path) -> str:
 
 
 def verify_plugin(plugin: PluginSpec) -> str:
+    if plugin.source_type == "npm":
+        assert plugin.integrity is not None
+        return plugin.integrity
+    assert plugin.artifact_path is not None
+    assert plugin.sha256 is not None
     path = Path(plugin.artifact_path)
     if not path.is_file():
         raise ValueError(f"Plugin artifact does not exist: {path}")
@@ -37,32 +42,63 @@ def verify_plugin(plugin: PluginSpec) -> str:
 
 
 def plugin_commands(instance: InstanceSpec, plugin: PluginSpec) -> list[list[str]]:
+    install_command = [
+        "podman",
+        "exec",
+        instance.container_name,
+        "openclaw",
+        "plugins",
+        "install",
+        "--force",
+        "--accept-capabilities",
+        plugin.install_target,
+    ]
+    if plugin.source_type == "npm":
+        install_command.append("--pin")
     commands = [
+        install_command,
         [
-            "podman", "exec", instance.container_name, "openclaw", "plugins", "install",
-            "--force", "--accept-capabilities", plugin.container_path,
-        ],
-        [
-            "podman", "exec", instance.container_name, "openclaw", "config", "set",
-            f"plugins.entries.{plugin.id}.enabled", "true" if plugin.enabled else "false",
-        ],
-        [
-            "podman", "exec", instance.container_name, "openclaw", "config", "set",
-            f"plugins.entries.{plugin.id}.config",
-            json.dumps(plugin.config, separators=(",", ":"), sort_keys=True),
+            "podman",
+            "exec",
+            instance.container_name,
+            "openclaw",
+            "config",
+            "set",
+            f"plugins.entries.{plugin.id}.enabled",
+            "true" if plugin.enabled else "false",
         ],
     ]
+    if plugin.config:
+        commands.append(
+            [
+                "podman",
+                "exec",
+                instance.container_name,
+                "openclaw",
+                "config",
+                "set",
+                f"plugins.entries.{plugin.id}.config",
+                json.dumps(plugin.config, separators=(",", ":"), sort_keys=True),
+            ]
+        )
     if plugin.custom_ui:
         commands.append(
             [
-                "podman", "exec", instance.container_name, "openclaw", "config", "set",
-                "gateway.controlUi.experimental.customPlugins", "true",
+                "podman",
+                "exec",
+                instance.container_name,
+                "openclaw",
+                "config",
+                "set",
+                "gateway.controlUi.experimental.customPlugins",
+                "true",
             ]
         )
     return commands
 
 
 def _verify_mounted_artifact(instance: InstanceSpec, plugin: PluginSpec) -> None:
+    assert plugin.sha256 is not None
     command = ["podman", "exec", instance.container_name, "sha256sum", plugin.container_path]
     process = subprocess.run(command, check=False, capture_output=True, text=True)
     if process.returncode != 0:
@@ -77,16 +113,59 @@ def _verify_mounted_artifact(instance: InstanceSpec, plugin: PluginSpec) -> None
         )
 
 
+def _verify_installed_npm_plugin(instance: InstanceSpec, plugin: PluginSpec) -> None:
+    assert plugin.npm_spec is not None
+    assert plugin.integrity is not None
+    command = [
+        "podman",
+        "exec",
+        instance.container_name,
+        "openclaw",
+        "plugins",
+        "inspect",
+        plugin.id,
+        "--runtime",
+        "--json",
+    ]
+    process = subprocess.run(command, check=False, capture_output=True, text=True)
+    if process.returncode != 0:
+        detail = process.stderr.strip() or process.stdout.strip()
+        raise RuntimeError(f"Cannot inspect installed plugin '{plugin.id}': {detail}")
+    try:
+        payload = json.loads(process.stdout)
+        installed = payload["install"]
+        actual_spec = installed["resolvedSpec"]
+        actual_integrity = installed["integrity"]
+        actual_id = payload["plugin"]["id"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise RuntimeError(
+            f"Cannot verify installed npm metadata for plugin '{plugin.id}'"
+        ) from exc
+    if actual_id != plugin.id or actual_spec != plugin.npm_spec:
+        raise RuntimeError(
+            f"Installed plugin '{plugin.id}' package mismatch: expected {plugin.npm_spec}, "
+            f"got {actual_spec}"
+        )
+    if actual_integrity != plugin.integrity:
+        raise RuntimeError(
+            f"Installed plugin '{plugin.id}' integrity mismatch: expected "
+            f"{plugin.integrity}, got {actual_integrity}"
+        )
+
+
 def sync_plugin(
     instance: InstanceSpec, plugin: PluginSpec, execute: bool = False
 ) -> PluginSyncResult:
     digest = verify_plugin(plugin)
     commands = plugin_commands(instance, plugin)
     if execute:
-        _verify_mounted_artifact(instance, plugin)
-        for command in commands:
+        if plugin.source_type == "archive":
+            _verify_mounted_artifact(instance, plugin)
+        for index, command in enumerate(commands):
             process = subprocess.run(command, check=False, capture_output=True, text=True)
             if process.returncode != 0:
                 detail = process.stderr.strip() or process.stdout.strip()
                 raise RuntimeError(f"Plugin command failed ({' '.join(command)}): {detail}")
+            if index == 0 and plugin.source_type == "npm":
+                _verify_installed_npm_plugin(instance, plugin)
     return PluginSyncResult(plugin.id, digest, commands)

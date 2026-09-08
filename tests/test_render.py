@@ -34,13 +34,13 @@ def test_render_includes_explicit_dns_servers() -> None:
     instance = next(item for item in inventory.instances if item.name == "fokus-partner")
 
     rendered = render_instance(instance, template_root=Path("templates"))
+    google = next(plugin for plugin in instance.plugins if plugin.id == "pflege-google-limited")
 
     assert "DNS=192.168.2.1" in rendered
     assert (
-        "Volume="
-        f"{instance.plugins[0].artifact_path}:"
-        "/opt/clawake/plugins/pflege-google-limited.tgz:ro"
+        f"Volume={google.artifact_path}:/opt/clawake/plugins/pflege-google-limited.tgz:ro"
     ) in rendered
+    assert "@openclaw/whatsapp" not in rendered
 
 
 def test_render_assets_include_container_network_and_volume() -> None:

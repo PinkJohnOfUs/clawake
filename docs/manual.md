@@ -140,21 +140,17 @@ podman exec fokus-partner openclaw plugins list
 podman exec fokus-partner openclaw channels --help
 ```
 
-Ist WhatsApp bereits passend gebündelt, diese Variante verwenden. Falls weiterhin
-eine externe Installation erforderlich ist, Quelle und kompatible Paketversion
-bewusst wählen und dokumentieren. Für den Fokus-Partner wurde die passende
-npm-Version explizit gepinnt:
+Für den Fokus-Partner sind npm-Version und Registry-Integrität im Team-Inventar
+explizit gepinnt. Installation und Prüfung erfolgen deshalb über Clawake:
 
 ```bash
-# Mutiert den Plugin-Zustand; erst nach Kompatibilitäts- und Quellenprüfung ausführen.
-podman exec fokus-partner openclaw plugins install \
-  npm:@openclaw/whatsapp@2026.9.2 --pin
-uv run clawake restart -c personal-team/team.yml -m fokus-partner --execute
+uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner
+uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner --execute
 ```
 
-Der OpenClaw-Plugin-Installer speichert diesen Pin im persistenten Zustand. Clawake
-deklariert oder prüft ihn aktuell nicht im Team-Inventar. Die OpenClaw-Dokumentation
-empfiehlt feste Plugin-Versionen und einen Neustart nach Codeänderungen.
+Clawake lässt keine Tags oder Versionsbereiche zu. Nach der Installation prüft es die
+von OpenClaw erfasste aufgelöste Version und SHA-512-Integrität, bevor die weitere
+Plugin-Konfiguration angewendet und die Instanz neu gestartet wird.
 [Quelle: Plugin-Verwaltung](https://docs.openclaw.ai/tools/plugin).
 
 Vor dem Verbinden die WhatsApp-Zugriffspolitik im OpenClaw-Setup konfigurieren:

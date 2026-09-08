@@ -24,7 +24,9 @@ DNS={{ dns_server }}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
 {% endfor %}
 {% for plugin in instance.plugins %}
+{% if plugin.source_type == 'archive' %}
 Volume={{ plugin.artifact_path }}:{{ plugin.container_path }}:ro
+{% endif %}
 {% endfor %}
 {% for port in instance.ports %}
 PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
