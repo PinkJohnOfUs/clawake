@@ -4,12 +4,7 @@ from pathlib import Path
 import pytest
 
 from clawake.config import InstanceSpec, PluginSpec
-from clawake.services.plugins import (
-    artifact_digest,
-    plugin_commands,
-    sync_plugin,
-    verify_plugin,
-)
+from clawake.services.plugins import artifact_digest, plugin_commands, sync_plugin, verify_plugin
 
 
 def _plugin(path: Path, digest: str) -> PluginSpec:
@@ -56,8 +51,7 @@ def test_plugin_commands_use_container_mount_and_structured_arguments(tmp_path: 
         "--accept-capabilities",
         "/opt/clawake/plugins/example-plugin.tgz",
     ]
-    assert commands[2][-1] == '{"publicOrigin":"http://127.0.0.1:18789"}'
-    assert commands[3][-2:] == ["gateway.controlUi.experimental.customPlugins", "true"]
+    assert len(commands) == 1
 
 
 def test_npm_plugin_requires_exact_version_and_integrity() -> None:

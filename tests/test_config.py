@@ -61,6 +61,17 @@ def test_inventory_defaults_project_root_to_repository() -> None:
     )
     assert plugin.container_path == "/opt/clawake/plugins/pflege-google-limited.tgz"
 
+    vault = next(item for item in fokus.plugins if item.id == "pflege-vault")
+    assert vault.sha256 == (
+        "sha256:5ae4df070439ac2a7bcd281fe4c3f8c8d70efb41bb57a59180ecde58b5e59a9f"
+    )
+    assert vault.config["masterKey"] == {
+        "source": "store",
+        "provider": "default",
+        "id": "PFLEGE_VAULT_MASTER_KEY",
+    }
+    assert fokus.agent_tool_allow == {"main": ["pflege_vault"]}
+
 
 def test_port_collision_validation(tmp_path: Path) -> None:
     collision = tmp_path / "collision.yaml"

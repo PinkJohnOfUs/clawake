@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, JsonValue, field_validator, model_validator
 
 
 def _project_root_from_environment(default: str = "") -> str:
@@ -58,7 +58,7 @@ class PluginSpec(BaseModel):
     sha256: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     npm_spec: str | None = None
     integrity: str | None = Field(default=None, pattern=r"^sha512-[A-Za-z0-9+/]+={0,2}$")
-    config: dict[str, str | bool | int] = Field(default_factory=dict)
+    config: dict[str, JsonValue] = Field(default_factory=dict)
     enabled: bool = True
     custom_ui: bool = False
 
@@ -148,6 +148,7 @@ class InstanceSpec(BaseModel):
     ports: list[PortSpec] = Field(default_factory=list)
     mounts: list[MountSpec] = Field(default_factory=list)
     plugins: list[PluginSpec] = Field(default_factory=list)
+    agent_tool_allow: dict[str, list[str]] = Field(default_factory=dict)
     env_files: list[str] = Field(default_factory=list)
     dns_servers: list[str] = Field(default_factory=list)
     labels: dict[str, str] = Field(default_factory=dict)
@@ -167,6 +168,21 @@ class InstanceSpec(BaseModel):
             except ValueError as exc:
                 raise ValueError(f"DNS server must be an IPv4 or IPv6 address: '{value}'") from exc
         return values
+
+    @field_validator("agent_tool_allow")
+    @classmethod
+    def validate_agent_tool_allow(cls, value: dict[str, list[str]]) -> dict[str, list[str]]:
+        agent_pattern = re.compile(r"^[A-Za-z0-9_.@-]+$")
+        tool_pattern = re.compile(r"^[A-Za-z0-9_.*:-]+$")
+        for agent_id, tools in value.items():
+            if not agent_pattern.fullmatch(agent_id):
+                raise ValueError(f"Invalid agent id in agent_tool_allow: '{agent_id}'")
+            if not tools or len(tools) != len(set(tools)):
+                raise ValueError(f"agent_tool_allow for '{agent_id}' must be non-empty and unique")
+            for tool in tools:
+                if not tool_pattern.fullmatch(tool):
+                    raise ValueError(f"Invalid tool id in agent_tool_allow: '{tool}'")
+        return value
 
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:

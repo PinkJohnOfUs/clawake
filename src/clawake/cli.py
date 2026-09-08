@@ -12,7 +12,11 @@ import yaml
 from clawake.config import ImageSpec, InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance, prune_backups
 from clawake.services.deployment import apply_artifacts, plan_deployment
-from clawake.services.gateway_config import ensure_control_ui_config, ensure_workspace_config
+from clawake.services.gateway_config import (
+    ensure_control_ui_config,
+    ensure_plugin_runtime_config,
+    ensure_workspace_config,
+)
 from clawake.services.image_check import ImageCheckError, check_image_availability
 from clawake.services.plugins import sync_plugin
 from clawake.services.runtime_upgrade import (
@@ -100,6 +104,11 @@ def sync_plugins(
                 typer.echo(f"   mount: {plugin.artifact_path} -> {plugin.container_path}:ro")
             else:
                 typer.echo(f"   npm: {plugin.npm_spec}")
+        for instance in selected:
+            for agent_id, tools in sorted(instance.agent_tool_allow.items()):
+                typer.echo(
+                    f" - {instance.name}: agent {agent_id} optional tools ({', '.join(tools)})"
+                )
     except (OSError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
@@ -114,20 +123,31 @@ def sync_plugins(
     service = SystemdService()
     failed = False
     restart_instances: dict[str, InstanceSpec] = {}
+    failed_instances: set[str] = set()
     for instance, plugin, _result in plans:
         try:
             result = sync_plugin(instance, plugin, execute=True)
             for command in result.commands:
-                displayed = list(command)
-                if len(displayed) >= 2 and displayed[-2].endswith(".config"):
-                    displayed[-1] = "<redacted-plugin-config>"
-                typer.echo(f"$ {' '.join(displayed)}")
+                typer.echo(f"$ {' '.join(command)}")
             typer.echo(f"Installed verified plugin {plugin.id} on {instance.name}")
             restart_instances[instance.name] = instance
         except (OSError, RuntimeError, ValueError) as exc:
             typer.echo(str(exc), err=True)
             failed = True
+            failed_instances.add(instance.name)
             continue
+    for instance in selected:
+        if instance.name in failed_instances:
+            continue
+        try:
+            config_path, config_changed = ensure_plugin_runtime_config(instance)
+            if config_changed:
+                typer.echo(f"Updated managed plugin config and agent ACLs in {config_path}")
+            restart_instances[instance.name] = instance
+        except (OSError, RuntimeError, ValueError) as exc:
+            typer.echo(str(exc), err=True)
+            failed = True
+            failed_instances.add(instance.name)
     for instance in restart_instances.values():
         restart_result = service.restart(instance.name, execute=True)
         _print_result(restart_result)

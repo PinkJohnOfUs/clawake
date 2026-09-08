@@ -55,46 +55,7 @@ def plugin_commands(instance: InstanceSpec, plugin: PluginSpec) -> list[list[str
     ]
     if plugin.source_type == "npm":
         install_command.append("--pin")
-    commands = [
-        install_command,
-        [
-            "podman",
-            "exec",
-            instance.container_name,
-            "openclaw",
-            "config",
-            "set",
-            f"plugins.entries.{plugin.id}.enabled",
-            "true" if plugin.enabled else "false",
-        ],
-    ]
-    if plugin.config:
-        commands.append(
-            [
-                "podman",
-                "exec",
-                instance.container_name,
-                "openclaw",
-                "config",
-                "set",
-                f"plugins.entries.{plugin.id}.config",
-                json.dumps(plugin.config, separators=(",", ":"), sort_keys=True),
-            ]
-        )
-    if plugin.custom_ui:
-        commands.append(
-            [
-                "podman",
-                "exec",
-                instance.container_name,
-                "openclaw",
-                "config",
-                "set",
-                "gateway.controlUi.experimental.customPlugins",
-                "true",
-            ]
-        )
-    return commands
+    return [install_command]
 
 
 def _verify_mounted_artifact(instance: InstanceSpec, plugin: PluginSpec) -> None:
