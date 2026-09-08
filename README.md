@@ -1,147 +1,138 @@
-# clawake
+# Clawake
 
-The sewer system beneath the bowls on which the agents are sitting. Effectively the sandbox for the agents, designed to contain all waste and prevent the cat from shitting in your house.
+**A reproducible home for your OpenClaw team.** Clawake turns a declarative team
+inventory into rootless Podman containers managed by Quadlet and systemd user
+services. It brings deployment, diagnostics and upgrades into one local CLI.
 
-`clawake` is a Python-first operations toolkit for managing one or more OpenClaw deployments running in rootless Podman containers through Quadlet and systemd user services.
+## Why it exists
 
-Operational defaults:
-- Safe by default (`dry-run` first, explicit `--execute` for mutations).
-- Staff-driven configuration (`-c/--config` YAML file).
+Running an agent is only the beginning. A useful team needs persistent workspaces,
+clear access boundaries, predictable startup and a way to recover when an upgrade
+fails. Maintaining those details by hand makes each deployment harder to explain
+and reproduce.
 
-## CLI Setup (uv + make)
+Clawake makes those operational decisions explicit. You describe the members,
+images, mounts and ports in YAML, review the proposed changes, then apply them.
+Each member gets its own workspace and runtime state, while team definitions are
+mounted read-only. This gives experiments a repeatable foundation and makes
+long-lived teams easier to maintain.
 
-`pyproject.toml` already defines the console entry point `clawake = "clawake.cli:app"`.
-That means the project knows how to expose a `clawake` command, but the command is only directly available after you run it through `uv` or install it into your user environment.
+## Purpose and vision
 
-Preferred for contributors (repo-local and reproducible):
+Clawake owns the **deployment lifecycle** around OpenClaw: inventory validation,
+Quadlet generation, service operations, dashboard diagnostics and controlled
+upgrades. OpenClaw owns agent behavior, conversations and runtime data. Podman and
+systemd provide container execution and service supervision.
+
+Our vision is that operating a personal agent team becomes as understandable as
+maintaining its team definition: inspect the desired state, preview a change,
+apply it deliberately and see what is running. The current implementation targets
+a local Linux host with rootless Podman and systemd user services. Remote fleet
+management, a web interface and automatic recovery are future directions, not
+features of the current CLI. Container isolation depends on the configured images,
+mounts and host permissions; Clawake does not provide a separate security boundary.
+
+## Get started
+
+You need Python 3.11+, `uv`, and—for runtime operations—a Linux host with rootless
+Podman, Quadlet support and a working systemd user session.
 
 ```bash
 make install-dev
-make doctor
-make setup-quadlets
-make status-quadlets
-```
-
-This uses `uv run clawake ...` against the project environment and avoids global drift.
-
-Optional user-level installation (global command on your machine):
-
-```bash
-make install-tool
-clawake --help
-```
-
-Remove user-level installation:
-
-```bash
-make uninstall-tool
-```
-
-Useful overrides:
-
-```bash
-make setup-quadlets CONFIG=examples/staff/team.yml
-make setup-quadlets MEMBER=product-owner
-make status-quadlets-json CONFIG=examples/staff/team.yml
-```
-
-## New Workflow (Phase 1 MVP)
-
-The current lifecycle is team/member oriented and built around Quadlet reconciliation.
-
-1. Prepare environment and dependencies:
-
-	```bash
-	export CLAWAKE_PROJECT_ROOT="$PWD"
-	make install-dev
-	```
-
-2. Preview changes (safe dry-run):
-
-	```bash
-	make setup-quadlets CONFIG=examples/staff/team.yml
-	```
-
-3. Apply changes (mutating):
-
-	```bash
-	make setup-quadlets-exec CONFIG=examples/staff/team.yml
-	```
-
-4. Check runtime health:
-
-	```bash
-	make status-quadlets CONFIG=examples/staff/team.yml
-	```
-
-5. Restart after config/image updates (optional):
-
-	```bash
-	make restart-quadlets-exec CONFIG=examples/staff/team.yml
-	```
-
-6. Teardown when needed:
-
-	```bash
-	make teardown-quadlets-exec CONFIG=examples/staff/team.yml
-	```
-
-## CLI Reference
-
-### Portable staff paths
-
-`examples/staff/team.yml` uses `${CLAWAKE_PROJECT_ROOT}` so paths stay portable across checkouts.
-The former `CLAWAKE_WORKSPACE_ROOT` name remains accepted for compatibility with existing
-inventory files and environments.
-
-### Simplified mount model
-
-`clawake` uses exactly two host paths per instance:
-
-- `workspace_path`: mounted at `/workspace` for runtime work.
-- `team_definition_path`: mounted read-only at `/team-definition`.
-
-For local CLI usage, set it once per shell:
-
-```bash
 export CLAWAKE_PROJECT_ROOT="$PWD"
+uv run clawake --help
+uv run clawake validate -c examples/staff/team.yml
+uv run clawake setup -c examples/staff/team.yml
 ```
 
-In VS Code launch configurations, set `CLAWAKE_PROJECT_ROOT` to `${workspaceFolder}`.
-In CI, set `CLAWAKE_PROJECT_ROOT` to the repository checkout path.
+Adapt the example inventory's images, host paths, ports and environment files to
+your team before applying it. Validation checks the inventory, rendering and
+installed artifact differences; it does not verify image availability or host
+runtime readiness.
 
-### Lifecycle commands
+```bash
+uv run clawake setup -c examples/staff/team.yml --execute
+uv run clawake status -c examples/staff/team.yml
+uv run clawake logs -c examples/staff/team.yml -m product-owner -n 50
+```
 
-- `clawake setup-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
-- `clawake restart-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
-- `clawake upgrade --config|-c <staff.yaml> --member|-m <name> --to <tag> --digest <sha256> [--execute]`
-- `clawake status-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--format text|json]`
-- `clawake teardown-quadlets --config|-c <staff.yaml> [--member|-m <name>] [--execute]`
+Lifecycle changes default to a preview. `setup` renders and compares in memory;
+without `--execute` it writes no files and starts no services. Applying setup
+prepares managed runtime configuration, writes changed Quadlets, reloads systemd
+and restarts every selected member, including members with unchanged artifacts.
+This can interrupt running work.
 
-### Makefile shortcuts
+For a user-level command, run `make install-tool`. Existing Make shortcuts and
+long command names such as `setup-quadlets` remain supported.
 
-- `make setup-quadlets`
-- `make setup-quadlets-exec`
-- `make restart-quadlets`
-- `make restart-quadlets-exec`
-- `make status-quadlets`
-- `make status-quadlets-json`
-- `make teardown-quadlets`
-- `make teardown-quadlets-exec`
-- `make test-lifecycle`
+## CLI
 
-### Parameter behavior
+Every command takes `--config/-c <inventory.yml>`. Commands that operate on a team
+accept `--member/-m <name>` to limit their scope.
 
-- `--execute`: required for commands that mutate host state/config.
-- `--config/-c`: team inventory file (for example `examples/staff/team.yml`).
-- `--member/-m`: scope operation to one member instead of the whole team.
-- `--format`: output format for `status-quadlets` (`text` or `json`).
+| Command | Purpose |
+| --- | --- |
+| `validate` | Check inventory and artifact rendering without changes |
+| `setup` | Preview or apply the team's deployment |
+| `status --format text\|json` | Inspect systemd service state and failure diagnostics |
+| `logs -m NAME [-n 100]` | Read a member's journal entries |
+| `restart` | Preview or restart selected services |
+| `onboard -m NAME` | Preview or run interactive OpenClaw onboarding |
+| `dashboard [--format json]` | Show local dashboard URLs and token presence |
+| `upgrade -m NAME --to TAG --digest sha256:…` | Preview or perform a pinned image upgrade |
+| `teardown` | Preview or remove selected containers and Quadlets |
 
-## Documentation
+Add `--execute` to apply `setup`, `restart`, `onboard`, `upgrade` or `teardown`.
+Dashboard tokens remain hidden unless `--show-token-url` is supplied. Teardown
+preserves workspace data. Status reports systemd state; successful status alone is
+not an application health check. Upgrade additionally checks HTTP health and the
+running image/version, and creates backups when enabled by inventory policy.
 
-Please find general architecture, roadmap, and operational notes in `docs/`.
+Exit codes: `0` for success (including previews), `1` for operational failure,
+`2` for invalid CLI arguments or inventory. JSON status is emitted on stdout and
+remains available when an unhealthy service causes exit code `1`.
 
-- Architecture: `docs/architecture.md`
-- Roadmap: `docs/repo-roadmap.md`
-- Upgrade runbook: `docs/upgrade-playbook.md`
-- Project overview: `docs/project-overview.md`
+Compatibility names: `setup-quadlets`, `restart-quadlets`, `status-quadlets`,
+`teardown-quadlets`, `onboard-member`, `diagnose-dashboard`.
+
+## Architecture
+
+```text
+CLI → validated inventory → deployment plan → explicit application
+                              ↓                      ↓
+                         Quadlet renderer      filesystem / systemd / Podman
+```
+
+`config.py` defines and validates the domain. `services/deployment.py` compares
+desired and installed artifacts without writing, and exposes a separate apply
+operation. Runtime adapters and upgrade helpers live in `services/`. `cli.py`
+provides commands, output and lifecycle orchestration. Setup and upgrade share the
+same artifact planning/application path. Further extraction of lifecycle
+orchestration can build on this boundary without introducing a second runtime.
+
+## Operations and security
+
+Start with the [operator manual](docs/manual.md), including the Fokus-Partner
+WhatsApp/API mismatch and the upgrade-to-channel-setup workflow. The
+[user journey](docs/user_journey.md) distinguishes today's commands from the CLI
+vision: explain compatibility and access changes before applying a member-scoped plan.
+
+Our [security assessment](docs/security.md) recommends keeping Clawake lean for this
+multi-member deployment. The outer container limits the gateway and its plugins;
+Quadlet makes its configuration reproducible. Clawake must earn its maintenance cost
+through reliable checks and recovery. The assessment also covers when native OpenClaw
+or manually maintained Quadlets are sufficient, and records current hardening gaps.
+
+See also [architecture and tradeoffs](docs/architecture.md), the
+[upgrade runbook](docs/upgrade-playbook.md), [roadmap](docs/repo-roadmap.md), and
+[example teams](examples/staff/README.md).
+
+## Development
+
+```bash
+uv run pytest
+uv run ruff check .
+```
+
+Tests exercise rendering, validation and lifecycle operations with temporary files
+and simulated runtime adapters. They do not require deploying a live team.

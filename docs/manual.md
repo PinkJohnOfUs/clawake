@@ -1,0 +1,195 @@
+# Clawake-Betriebshandbuch
+
+Stand: 8. September 2026. Dieses Handbuch beschreibt die vorhandene CLI und beginnt
+mit dem realen Fall „WhatsApp für den Fokus-Partner“. Die gewünschte Weiterentwicklung
+steht in der [User Journey](user_journey.md); Sicherheitsannahmen und Alternativen
+in der [Sicherheitsbewertung](security.md).
+
+## 1. Zuständigkeiten und Vorbereitung
+
+Clawake verwaltet Images, Quadlets und den Lebenszyklus eines Mitglieds. OpenClaw
+verwaltet Modelle, Plugins, Kanäle und Gespräche. Auf dem Host läuft Clawake; Befehle
+zur OpenClaw-Konfiguration laufen im betreffenden Container. Ein OpenClaw-Mitglied
+wird mit seinem Inventarnamen ausgewählt, hier `fokus-partner`.
+
+Alle folgenden Clawake-Beispiele werden im Repository-Verzeichnis ausgeführt:
+
+```bash
+make install-dev
+export CLAWAKE_PROJECT_ROOT="$PWD"
+uv run clawake validate -c personal-team/team.yml -m fokus-partner
+uv run clawake status -c personal-team/team.yml -m fokus-partner
+uv run clawake logs -c personal-team/team.yml -m fokus-partner -n 50
+```
+
+`validate` prüft Schema, Rendering und Unterschiede zu installierten Dateien. Es
+prüft weder Plugin-Kompatibilität noch die Funktionsfähigkeit von Podman. `status`
+zeigt den systemd-Zustand; ein aktiver Dienst beweist keine funktionierende
+WhatsApp-Verbindung. Diagnoseausgaben können persönliche Inhalte enthalten.
+
+## 2. Ein Mitglied bereitstellen und initialisieren
+
+```bash
+uv run clawake setup -c personal-team/team.yml -m fokus-partner
+uv run clawake setup -c personal-team/team.yml -m fokus-partner --execute
+uv run clawake onboard -c personal-team/team.yml -m fokus-partner
+uv run clawake onboard -c personal-team/team.yml -m fokus-partner --execute
+uv run clawake dashboard -c personal-team/team.yml -m fokus-partner
+```
+
+Vor `setup --execute` müssen die im Inventar referenzierten Teamdefinitionen und
+Environment-Dateien vorbereitet sein. Setup erzeugt Laufzeitverzeichnisse und
+verwaltete OpenClaw-Einstellungen, installiert Quadlets und startet die ausgewählten
+Dienste neu – auch bei unveränderten Quadlets. Onboarding öffnet den interaktiven
+OpenClaw-Assistenten im Container. Dort werden insbesondere Modellzugang und
+Laufzeiteinstellungen eingerichtet. Rolleninformationen stammen aus
+`/team-definition`; eine Rollenbeschreibung ersetzt keine technische Berechtigung.
+
+## 3. Fall: WhatsApp-Plugin wird wegen der Plugin-API abgelehnt
+
+Gemeldeter Fehler:
+
+```text
+Plugin "@openclaw/whatsapp" requires plugin API >=2026.9.2,
+but this OpenClaw runtime exposes 2026.8.2.
+```
+
+Beim Vorfall am 7. September wurde lesend bestätigt:
+
+```bash
+podman exec fokus-partner openclaw --version
+# OpenClaw 2026.8.2 (0965053)
+```
+
+Das Inventar pinnte damals `ghcr.io/openclaw/openclaw:2026.8.2-browser` auf einen
+Digest. Die Plugin-Auswahl hatte ein Paket angefordert, dessen Mindest-API neuer war
+als die laufende Runtime. Dieser erste Installationsversuch scheiterte an der
+Kompatibilitätsprüfung.
+
+Ein Neustart startet dasselbe alte Image. Auch eine neue Clawake-Version erneuert
+OpenClaw nicht automatisch. Für das ausgewählte Paket ist eine Runtime mit API
+mindestens `2026.9.2` erforderlich. Das offizielle Release
+[2026.9.2](https://github.com/openclaw/openclaw/releases/tag/v2026.9.2) existiert.
+Die Veröffentlichung eines passenden Browser-Images samt Digest muss vor dem
+Upgrade zusätzlich geprüft werden; sie wurde hier nicht verifiziert.
+
+Alternativ kommt eine nachweislich kompatible ältere Plugin-Version oder eine im
+alten Image gebündelte Variante infrage. Ob diese für WhatsApp verfügbar und
+geeignet ist, ist offen. Die aktuelle Dokumentation unterscheidet explizite
+ClawHub-Quellen von gebündelten und npm-Paketen; deren Auflösungsregeln dürfen nicht
+ungeprüft auf 2026.8.2 übertragen werden.
+[Quelle: OpenClaw-Plugins](https://docs.openclaw.ai/tools/plugin).
+
+## 4. Upgrade vorbereiten
+
+Die Browser-Variante beibehalten, sofern der Fokus-Partner weiterhin Browserwerkzeuge
+benötigt. Vorab Release-Hinweise, Hostanforderungen und Plugin-Kompatibilität prüfen.
+Den tatsächlich veröffentlichten Tag und den zugehörigen **Image-Manifest-Digest**
+aus der [offiziellen Container-Registry](https://github.com/openclaw/openclaw/pkgs/container/openclaw)
+ermitteln; die SHA256-Prüfsumme eines Release-ZIP ist kein Container-Digest.
+
+Für zukünftige Upgrades müssen die folgenden Variablen bewusst gesetzt werden; sie
+enthalten hier keine behaupteten Zielwerte:
+
+```bash
+: "${CLAWAKE_TARGET_TAG:?Setze den verifizierten Ziel-Tag inklusive Image-Variante}"
+: "${CLAWAKE_TARGET_DIGEST:?Setze den passenden sha256-Image-Digest}"
+uv run clawake upgrade -c personal-team/team.yml -m fokus-partner \
+  --to "$CLAWAKE_TARGET_TAG" --digest "$CLAWAKE_TARGET_DIGEST"
+```
+
+Diese Vorschau kontaktiert keine Registry. Erst die Ausführung prüft Tag und Digest.
+Vorher laufende Arbeit abschließen und ein Wartungsfenster vorsehen. Im aktuellen
+Inventar sind Backup vor Mutation und sieben aufzubewahrende Sicherungen aktiviert.
+
+**Aktuelle Backup-Grenze:** Der Backup-Code überspringt fehlende bzw. unlesbare
+Pfade teilweise, ohne das Upgrade zuverlässig abzubrechen. Ein erzeugtes Archiv
+beweist daher keine vollständige Sicherung. Environment-Dateien außerhalb des
+Workspaces sind nicht automatisch enthalten; zusätzliche Quellen benötigen
+`backup_policy.paths`. Zugangsdaten und WhatsApp-Sitzungen gehören zur geschützten
+Wiederherstellungsbasis. Vor einem wichtigen Upgrade vollständige, lesbare und
+wiederherstellbare Sicherungen unabhängig prüfen. Details im
+[Upgrade-Playbook](upgrade-playbook.md).
+
+## 5. Upgrade ausführen und prüfen
+
+Nach geprüfter Zielversion und Sicherung:
+
+```bash
+uv run clawake upgrade -c personal-team/team.yml -m fokus-partner \
+  --to "${CLAWAKE_TARGET_TAG:?Ziel-Tag fehlt}" \
+  --digest "${CLAWAKE_TARGET_DIGEST:?Ziel-Digest fehlt}" --execute
+uv run clawake status -c personal-team/team.yml -m fokus-partner
+podman exec fokus-partner openclaw --version
+```
+
+Clawake prüft das Image, stoppt den Dienst, sichert nach Policy, führt Migrationen
+im Zielimage aus, aktualisiert das Inventar und die Quadlets und prüft nach dem
+Neustart HTTP-Health sowie Runtime-Version und Image-Referenz. Das ist keine atomare
+Transaktion und kein Plugin-Kompatibilitätstest. Nicht per Paketmanager oder
+Selbstupdate im laufenden Container aktualisieren: Sonst weichen Laufzeit und
+gepinntes Inventar voneinander ab.
+
+## 6. WhatsApp nach dem Runtime-Upgrade einrichten
+
+Zuerst die in der gewählten Version verfügbaren Befehle und Plugins prüfen:
+
+```bash
+podman exec fokus-partner openclaw plugins --help
+podman exec fokus-partner openclaw plugins list
+podman exec fokus-partner openclaw channels --help
+```
+
+Ist WhatsApp bereits passend gebündelt, diese Variante verwenden. Falls weiterhin
+eine externe Installation erforderlich ist, Quelle und kompatible Paketversion
+bewusst wählen und dokumentieren. Für den Fokus-Partner wurde die passende
+npm-Version explizit gepinnt:
+
+```bash
+# Mutiert den Plugin-Zustand; erst nach Kompatibilitäts- und Quellenprüfung ausführen.
+podman exec fokus-partner openclaw plugins install \
+  npm:@openclaw/whatsapp@2026.9.2 --pin
+uv run clawake restart -c personal-team/team.yml -m fokus-partner --execute
+```
+
+Der OpenClaw-Plugin-Installer speichert diesen Pin im persistenten Zustand. Clawake
+deklariert oder prüft ihn aktuell nicht im Team-Inventar. Die OpenClaw-Dokumentation
+empfiehlt feste Plugin-Versionen und einen Neustart nach Codeänderungen.
+[Quelle: Plugin-Verwaltung](https://docs.openclaw.ai/tools/plugin).
+
+Vor dem Verbinden die WhatsApp-Zugriffspolitik im OpenClaw-Setup konfigurieren:
+Pairing bzw. ausdrücklich erlaubte Absender, begrenzte Gruppen und passende
+Werkzeugrechte. Anschließend mit der für die Zielversion bestätigten Syntax:
+
+```bash
+podman exec -it fokus-partner openclaw channels login --channel whatsapp
+podman exec fokus-partner openclaw channels status --probe
+podman exec fokus-partner openclaw security audit
+```
+
+QR-Verknüpfung des WhatsApp-Kontos und Freigabe eines Nachrichtensenders sind zwei
+verschiedene Schritte. QR und Sitzungsdaten vertraulich behandeln. Einen echten
+Nachrichtentest bewusst mit dem eigenen Testkontakt durchführen; ein grüner
+systemd-Status reicht nicht als Abnahme.
+[Quelle: WhatsApp-Einrichtung](https://docs.openclaw.ai/channels/whatsapp),
+[Security CLI](https://docs.openclaw.ai/cli/security).
+
+## 7. Fehler und Wiederherstellung
+
+| Symptom | Nächster Schritt |
+| --- | --- |
+| Mindest-Plugin-API zu neu | Runtime/Plugin-Versionen abgleichen; keine Rechte lockern |
+| `npm` meldet `EAI_AGAIN` | DNS im Container und auf dem Host vergleichen; bei einem defekten Podman-Forwarder einen geprüften Resolver über `dns_servers` im Mitglied konfigurieren und Setup erneut anwenden |
+| Registry-Prüfung schlägt fehl | Tag, Variante und Digest prüfen; Dienst wurde noch nicht gestoppt |
+| Migration schlägt fehl | Logs und Sicherung prüfen; alter Dienst kann neu gestartet worden sein, Zustand kann bereits migriert sein |
+| Fehler nach Inventaränderung | Dienst bleibt nach Fehlerbehandlung gestoppt; Recovery-Pfade auswerten |
+| Dienst aktiv, WhatsApp offline | Kanaldiagnose, Kontoverknüpfung und Zugriffspolitik prüfen |
+
+Es gibt noch keinen `clawake rollback`-Befehl. Bei Bedarf Dienst stoppen, Sicherung
+zuerst in ein separates Verzeichnis entpacken und prüfen, passende Runtime-Daten
+und das Image-Paar gezielt wiederherstellen und erst danach Setup ausführen. Ein
+altes Image mit bereits migrierten Daten ist kein verlässlicher Rollback.
+
+`teardown --execute` entfernt ausgewählte Container und Quadlets, bewahrt aber
+Workspace-Daten. Es ist weder ein Backup noch eine vollständige Löschung von
+Zugangsdaten oder personenbezogenen Informationen.
