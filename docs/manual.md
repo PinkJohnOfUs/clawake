@@ -170,7 +170,24 @@ systemd-Status reicht nicht als Abnahme.
 [Quelle: WhatsApp-Einrichtung](https://docs.openclaw.ai/channels/whatsapp),
 [Security CLI](https://docs.openclaw.ai/cli/security).
 
-## 7. Fehler und Wiederherstellung
+## 7. Pflege-Vault und geschützten Schlüssel einrichten
+
+`pflege-vault` speichert ausschließlich AES-256-GCM-Ciphertext im persistenten
+OpenClaw-State. Der Master-Key darf weder im Chat noch in `team.yml`, `.env`,
+Shell-Argumenten oder Logs erscheinen. Im lokalen Control UI unter
+`Settings -> Secrets` einen `Protected secret` namens
+`PFLEGE_VAULT_MASTER_KEY` anlegen. Für diesen Config-SecretRef bleiben die
+Egress-Hosts leer.
+
+Das Team-Inventar pinnt Archiv, Vault-Pfad, SecretRef und die zweifache Agenten-ACL:
+Das optionale Tool wird nur für Agent `main` allowgelistet und das Plugin prüft die
+Laufzeit-`agentId` zusätzlich selbst. Danach den üblichen Plugin-Sync ausführen.
+
+Ein nicht zustellbarer agentischer Credential-Prompt ist kein Grund, den Schlüssel
+im Chat einzufügen. Stattdessen immer die direkte Secrets-Seite oder den interaktiven
+`openclaw secrets store set`-Befehl verwenden.
+
+## 8. Fehler und Wiederherstellung
 
 | Symptom | Nächster Schritt |
 | --- | --- |

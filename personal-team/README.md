@@ -67,6 +67,13 @@ exakte npm-Version mit der vom Registry-Paket gelieferten SHA-512-Integrität ve
 Google-Credentials und Tokens bleiben ausschließlich
 im ignorierten Laufzeitverzeichnis `workspaces/fokus/.openclaw/secrets`.
 
+Das lokale Archiv `pflege-vault` ist ebenfalls SHA-256-gepinnt. Sein Ciphertext
+liegt unter `/home/node/.openclaw/pflege-vault/vault.json` auf dem persistenten
+OpenClaw-State-Mount. Der AES-Schlüssel wird ausschließlich als geschütztes,
+write-only Secret `PFLEGE_VAULT_MASTER_KEY` im OpenClaw Secret Store gehalten.
+`agent_tool_allow` gibt das optionale Tool nur für Agent `main` frei; zusätzlich
+verweigert das Plugin selbst jede andere `agentId`.
+
 Nach einer Quellcodeänderung das Plugin gemäß seiner README bauen und testen, das neue
 Archiv und dessen SHA-256 im Inventar prüfen und anschließend erst Quadlet und Plugin
 anwenden:
@@ -84,6 +91,15 @@ npm-Plugins akzeptiert es nur eine exakte Version und gleicht nach der Installat
 `resolvedSpec` sowie die SHA-512-Integrität mit dem Inventar ab. Danach setzt es die
 deklarierte Plugin-Konfiguration ohne Ausgabe ihres Inhalts und startet die Instanz
 neu. Das Akzeptieren der Plugin-Fähigkeiten ist damit an den jeweiligen Pin gebunden.
+Deklarierte `agent_tool_allow`-Einträge werden als per-Agent-`tools.alsoAllow`
+angewendet. Clawake merkt sich ausschließlich seine eigenen Ergänzungen in einer
+lokalen Statusdatei, damit entfernte Freigaben beim nächsten Sync entzogen werden,
+ohne manuell gepflegte Tool-Freigaben zu überschreiben.
+
+Ein neues Vault-Secret kann ohne Chat und ohne Kommandozeilenargument direkt im
+lokalen Dashboard unter `Settings -> Secrets` angelegt werden. Typ `Protected
+secret` wählen und keine Egress-Hosts eintragen; der Schlüssel dient ausschließlich
+als Config-SecretRef.
 
 In `plugins[].config` gehören nur nicht geheime Werte oder Verweise auf OpenClaw-
 Secrets, niemals Token oder Passwörter. Das Git-Repository sichert Quellcode und

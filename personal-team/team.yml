@@ -128,6 +128,22 @@ instances:
           credentialsPath: /home/node/.openclaw/secrets/pflege-google-web-credentials.json
           tokenPath: /home/node/.openclaw/secrets/pflege-google-web-token.json
           publicOrigin: http://127.0.0.1:18989
+      - id: pflege-vault
+        artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-vault/releases/pflege-vault-0.1.0-openclaw-2026.9.2.tgz
+        sha256: sha256:5ae4df070439ac2a7bcd281fe4c3f8c8d70efb41bb57a59180ecde58b5e59a9f
+        enabled: true
+        config:
+          vaultPath: /home/node/.openclaw/pflege-vault/vault.json
+          allowedAgentId: main
+          activeKeyVersion: 1
+          masterKey:
+            source: store
+            provider: default
+            id: PFLEGE_VAULT_MASTER_KEY
+          previousKeys: []
+    agent_tool_allow:
+      main:
+        - pflege_vault
     labels:
       env: personal
       audience: private

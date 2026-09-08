@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tgz
+!releases/
+!releases/*.tgz
+*.log
+
+# Vault data and key material must never enter the source tree.
+vault.json
+*.key
+.env
