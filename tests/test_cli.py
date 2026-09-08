@@ -410,3 +410,64 @@ def test_teardown_quadlets_dry_run_succeeds(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "DRY RUN teardown-quadlets complete" in result.output
+
+
+def test_setup_preview_and_validate_do_not_write(monkeypatch: object, tmp_path: Path) -> None:
+    cfg, _, _ = _write_inventory(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    for command in ("setup", "validate"):
+        result = runner.invoke(app, [command, "-c", str(cfg)])
+        assert result.exit_code == 0, result.output
+    after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    assert before == after
+    assert not (tmp_path / ".rendered").exists()
+    assert not (tmp_path / "quadlet-target").exists()
+
+
+def test_invalid_yaml_reports_config_error(tmp_path: Path) -> None:
+    config = tmp_path / "broken.yml"
+    config.write_text("instances: [", encoding="utf-8")
+    result = runner.invoke(app, ["validate", "-c", str(config)])
+    assert result.exit_code == 2
+    assert "Cannot load" in result.output
+    assert "--config" in result.output
+
+
+def test_unknown_member_lists_available_members(tmp_path: Path) -> None:
+    cfg, _, _ = _write_inventory(tmp_path)
+    result = runner.invoke(app, ["setup", "-c", str(cfg), "-m", "missing"])
+    assert result.exit_code == 2
+    assert "Available: one" in result.output
+
+
+def test_reload_failure_prevents_restart(monkeypatch: object, tmp_path: Path) -> None:
+    from clawake import cli
+
+    class FailedReload:
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            return CommandResult(["systemctl"], 1, "", "reload failed")
+
+        def restart(self, *args: object, **kwargs: object) -> CommandResult:
+            raise AssertionError("Must not restart after reload failure")
+
+    cfg, _, _ = _write_inventory(tmp_path)
+    monkeypatch.setattr(cli, "SystemdService", FailedReload)
+    result = runner.invoke(app, ["setup", "-c", str(cfg), "--execute"])
+    assert result.exit_code == 1
+    assert "reload failed" in result.output
+
+
+def test_logs_scopes_member_and_line_count(monkeypatch: object, tmp_path: Path) -> None:
+    from clawake import cli
+
+    class Journal:
+        def logs(self, name: str, lines: int, execute: bool) -> CommandResult:
+            assert (name, lines, execute) == ("one", 25, True)
+            return CommandResult(["journalctl"], 0, "gateway ready", "")
+
+    cfg, _, _ = _write_inventory(tmp_path)
+    monkeypatch.setattr(cli, "SystemdService", Journal)
+    result = runner.invoke(app, ["logs", "-c", str(cfg), "-m", "one", "-n", "25"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "gateway ready"

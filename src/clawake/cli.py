@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
+import yaml
 
 from clawake.config import ImageSpec, InstanceSpec, Inventory, load_inventory
 from clawake.services.backup import backup_instance, prune_backups
+from clawake.services.deployment import apply_artifacts, plan_deployment
 from clawake.services.gateway_config import ensure_control_ui_config, ensure_workspace_config
 from clawake.services.image_check import ImageCheckError, check_image_availability
-from clawake.services.render import render_instance_assets
 from clawake.services.runtime_upgrade import (
     doctor_command,
     ensure_browser_cache,
@@ -26,13 +25,19 @@ from clawake.services.runtime_upgrade import (
 from clawake.services.systemd import CommandResult, SystemdService
 from clawake.services.upgrade import apply_upgrade, backup_config, build_upgrade_plan
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-
-app = typer.Typer(help="OpenClaw operations manager for rootless Podman + Quadlet")
+app = typer.Typer(
+    help="Deploy and operate OpenClaw teams. Changes are previewed unless --execute is set.",
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+)
 
 ConfigPath = Annotated[Path, typer.Option(..., "--config", "-c", exists=True, dir_okay=False)]
-OptionalMemberName = Annotated[str | None, typer.Option("--member", "-m")]
-ExecuteFlag = Annotated[bool, typer.Option("--execute")]
+OptionalMemberName = Annotated[
+    str | None, typer.Option("--member", "-m", help="Select one member; default: entire team.")
+]
+ExecuteFlag = Annotated[
+    bool, typer.Option("--execute", help="Apply the previewed operation to the local host.")
+]
 StatusFormat = Annotated[Literal["text", "json"], typer.Option("--format")]
 ShowTokenUrlFlag = Annotated[bool, typer.Option("--show-token-url")]
 TargetTag = Annotated[str, typer.Option(..., "--to", help="Target OpenClaw image tag")]
@@ -42,7 +47,10 @@ _ENV_LINE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
 
 def _load(path: Path) -> Inventory:
-    return load_inventory(path)
+    try:
+        return load_inventory(path)
+    except (ValueError, yaml.YAMLError, OSError) as exc:
+        raise typer.BadParameter(f"Cannot load {path}: {exc}", param_hint="--config") from exc
 
 
 def _template_root() -> Path:
@@ -53,7 +61,11 @@ def _instance_by_name(inventory: Inventory, name: str) -> InstanceSpec:
     for instance in inventory.instances:
         if instance.name == name:
             return instance
-    raise typer.BadParameter(f"Unknown member '{name}'")
+    raise typer.BadParameter(
+        f"Unknown member '{name}'. Available: "
+        + ", ".join(instance.name for instance in inventory.instances),
+        param_hint="--member",
+    )
 
 
 def _select_instances(inventory: Inventory, member: str | None) -> list[InstanceSpec]:
@@ -67,7 +79,7 @@ def _print_result(result: CommandResult) -> None:
     if result.stdout:
         typer.echo(result.stdout)
     if result.stderr:
-        typer.echo(result.stderr)
+        typer.echo(result.stderr, err=True)
 
 
 def _status_state(result: CommandResult) -> str:
@@ -147,22 +159,8 @@ def _dashboard_host_url(instance: InstanceSpec) -> str:
 def _deploy_instance_assets(
     instance: InstanceSpec,
     inventory: Inventory,
-    output: Path = Path(".rendered"),
 ) -> list[Path]:
-    host_map = {host.name: host for host in inventory.hosts}
-    destination_root = Path(host_map[instance.host].quadlet_root).expanduser()
-    deployed: list[Path] = []
-    for relative_path, rendered_text in render_instance_assets(
-        instance, template_root=_template_root()
-    ).items():
-        rendered_file = output / relative_path
-        rendered_file.parent.mkdir(parents=True, exist_ok=True)
-        rendered_file.write_text(rendered_text, encoding="utf-8")
-        destination = destination_root / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(rendered_file, destination)
-        deployed.append(destination)
-    return deployed
+    return apply_artifacts(plan_deployment(inventory, [instance], _template_root()))
 
 
 @app.command("upgrade")
@@ -403,36 +401,17 @@ def setup_quadlets(
         typer.echo("No matching members selected for setup")
         return
 
-    output = Path(".rendered")
-    output.mkdir(parents=True, exist_ok=True)
-    template_root = _template_root()
-    host_map = {host.name: host for host in inventory.hosts}
-    changed_artifacts: list[tuple[InstanceSpec, Path, Path]] = []
-    changed_instance_names: set[str] = set()
-
-    for instance in selected:
-        host = host_map[instance.host]
-        for relative_path, rendered_text in render_instance_assets(
-            instance,
-            template_root=template_root,
-        ).items():
-            rendered_file = output / relative_path
-            rendered_file.parent.mkdir(parents=True, exist_ok=True)
-            rendered_file.write_text(rendered_text, encoding="utf-8")
-
-            destination = Path(host.quadlet_root).expanduser() / relative_path
-            current_text = destination.read_text(encoding="utf-8") if destination.exists() else ""
-            if current_text != rendered_text:
-                changed_artifacts.append((instance, rendered_file, destination))
-                changed_instance_names.add(instance.name)
+    changed_artifacts = plan_deployment(inventory, selected, _template_root())
+    changed_instance_names = {change.member for change in changed_artifacts}
 
     typer.echo(
         f"Setup plan for cluster '{inventory.cluster.name}' ({inventory.cluster.mode}): "
         f"{len(changed_instance_names)}/{len(selected)} member(s) changed"
     )
 
-    for instance, rendered_file, destination in changed_artifacts:
-        typer.echo(f" - {instance.name} [{instance.role}] {rendered_file} -> {destination}")
+    for change in changed_artifacts:
+        typer.echo(f" - {change.member} [{change.role}] write {change.destination}")
+    typer.echo("  Apply: prepare runtime config, reload systemd, restart selected members.")
 
     if not execute:
         typer.echo("DRY RUN setup-quadlets complete. Re-run with --execute to mutate state.")
@@ -454,14 +433,13 @@ def setup_quadlets(
         if gateway_config_changed:
             typer.echo(f"Updated local Control UI access in {gateway_config}")
 
-    for _instance, rendered_file, destination in changed_artifacts:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(rendered_file, destination)
-        typer.echo(f"Deployed {rendered_file} -> {destination}")
+    for destination in apply_artifacts(changed_artifacts):
+        typer.echo(f"Deployed {destination}")
 
     reload_result = service.daemon_reload(execute=True)
     _print_result(reload_result)
-    failed = failed or reload_result.return_code != 0
+    if reload_result.return_code != 0:
+        raise typer.Exit(code=1)
 
     if not changed_artifacts:
         typer.echo("No rendered changes detected; ensuring selected services are running.")
@@ -624,6 +602,44 @@ def teardown_quadlets(
 
     if failed:
         raise typer.Exit(code=1)
+
+
+@app.command("validate")
+def validate_inventory(config: ConfigPath, member: OptionalMemberName = None) -> None:
+    """Validate inventory and render selected members without writes or runtime calls."""
+    inventory = _load(config)
+    selected = _select_instances(inventory, member)
+    changes = plan_deployment(inventory, selected, _template_root())
+    typer.echo(
+        f"Valid inventory: {inventory.cluster.name}; {len(selected)} member(s), "
+        f"{len(changes)} artifact change(s)."
+    )
+
+
+@app.command("logs")
+def member_logs(
+    config: ConfigPath,
+    member: Annotated[str, typer.Option(..., "--member", "-m")],
+    lines: Annotated[int, typer.Option("--lines", "-n", min=1, max=10000)] = 100,
+) -> None:
+    """Read the latest journal entries for one member."""
+    instance = _instance_by_name(_load(config), member)
+    result = SystemdService().logs(instance.name, lines=lines, execute=True)
+    if result.stdout:
+        typer.echo(result.stdout)
+    if result.stderr:
+        typer.echo(result.stderr, err=True)
+    if result.return_code:
+        raise typer.Exit(code=1)
+
+
+# Intent-oriented names; established commands remain compatible with scripts and Make.
+app.command("setup")(setup_quadlets)
+app.command("restart")(restart_quadlets)
+app.command("status")(status_quadlets)
+app.command("teardown")(teardown_quadlets)
+app.command("onboard")(onboard_member)
+app.command("dashboard")(diagnose_dashboard)
 
 
 if __name__ == "__main__":
