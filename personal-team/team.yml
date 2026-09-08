@@ -95,10 +95,10 @@ instances:
     container_name: fokus-partner
     image:
       repository: ghcr.io/openclaw/openclaw
-      tag: "2026.8.2-browser"
-      digest: sha256:e164a318801fad2d49dc19b99adadfa629fa5f9ffb43673e73661c1d3f9cc7de
-      known_good_tag: "2026.8.2"
-      known_good_digest: sha256:5d25165995041caa6a7175bec82b25ad98c44eb269bb42435da8e27ec06e6be4
+      tag: "2026.9.2-browser"
+      digest: sha256:f57ec52faf5e92da835ababa3b9ffd5fc820496f5c79247e483a9a4e46f51293
+      known_good_tag: "2026.8.2-browser"
+      known_good_digest: sha256:e164a318801fad2d49dc19b99adadfa629fa5f9ffb43673e73661c1d3f9cc7de
     ports:
       - bind_address: 127.0.0.1
         host_port: 18989
@@ -110,6 +110,10 @@ instances:
         protocol: tcp
     env_files:
       - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/fokus.env
+    # The host uses systemd-resolved's loopback stub, which aardvark-dns cannot
+    # forward reliably from its network namespace. Use the LAN resolver directly.
+    dns_servers:
+      - 192.168.2.1
     labels:
       env: personal
       audience: private

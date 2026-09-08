@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def _project_root_from_environment(default: str = "") -> str:
@@ -98,6 +99,7 @@ class InstanceSpec(BaseModel):
     ports: list[PortSpec] = Field(default_factory=list)
     mounts: list[MountSpec] = Field(default_factory=list)
     env_files: list[str] = Field(default_factory=list)
+    dns_servers: list[str] = Field(default_factory=list)
     labels: dict[str, str] = Field(default_factory=dict)
     public_url: str | None = None
     health: HealthSpec = Field(default_factory=HealthSpec)
@@ -105,6 +107,16 @@ class InstanceSpec(BaseModel):
     backup_policy: BackupPolicy = Field(default_factory=BackupPolicy)
     gateway_runtime: GatewayRuntimeSpec = Field(default_factory=GatewayRuntimeSpec)
     dashboard: DashboardMeta
+
+    @field_validator("dns_servers")
+    @classmethod
+    def validate_dns_servers(cls, values: list[str]) -> list[str]:
+        for value in values:
+            try:
+                ip_address(value)
+            except ValueError as exc:
+                raise ValueError(f"DNS server must be an IPv4 or IPv6 address: '{value}'") from exc
+        return values
 
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:

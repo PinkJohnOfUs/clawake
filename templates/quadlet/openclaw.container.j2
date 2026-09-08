@@ -17,6 +17,9 @@ Volume={{ instance.workspace_path }}:/workspace
 Volume={{ instance.team_definition_path }}:/team-definition:ro
 Volume={{ instance.workspace_path }}/.openclaw:/home/node/.openclaw
 Network={{ instance.network_quadlet_path }}
+{% for dns_server in instance.dns_servers %}
+DNS={{ dns_server }}
+{% endfor %}
 {% for mount in instance.mounts %}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
 {% endfor %}

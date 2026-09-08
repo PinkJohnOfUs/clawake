@@ -52,6 +52,8 @@ def doctor_command(instance: InstanceSpec, image: ImageSpec) -> list[str]:
         )
     for env_file in instance.env_files:
         command.extend(["--env-file", env_file])
+    for dns_server in instance.dns_servers:
+        command.extend(["--dns", dns_server])
     command.extend(
         [
             "--volume",

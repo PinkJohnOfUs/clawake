@@ -33,6 +33,7 @@ def _instance(tmp_path: Path) -> InstanceSpec:
 
 def test_doctor_command_reuses_member_runtime_boundaries(tmp_path: Path) -> None:
     instance = _instance(tmp_path)
+    instance.dns_servers = ["192.168.2.1"]
     target = ImageSpec(repository="ghcr.io/openclaw/openclaw", tag="2026.8.2", digest="sha256:new")
 
     command = doctor_command(instance, target)
@@ -41,6 +42,10 @@ def test_doctor_command_reuses_member_runtime_boundaries(tmp_path: Path) -> None
     assert command[env_index : env_index + 2] == ["--env-file", instance.env_files[0]]
     assert f"{instance.workspace_path}:/workspace" in command
     assert f"{instance.workspace_path}/.openclaw:/home/node/.openclaw" in command
+    assert command[command.index("--dns") : command.index("--dns") + 2] == [
+        "--dns",
+        "192.168.2.1",
+    ]
     assert command[-5:] == ["openclaw", "doctor", "--fix", "--non-interactive", "--yes"]
 
 

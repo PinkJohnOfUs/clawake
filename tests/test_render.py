@@ -29,6 +29,15 @@ def test_render_contains_expected_container_data() -> None:
     ) in rendered
 
 
+def test_render_includes_explicit_dns_servers() -> None:
+    inventory = load_inventory(Path("personal-team/team.yml"))
+    instance = next(item for item in inventory.instances if item.name == "fokus-partner")
+
+    rendered = render_instance(instance, template_root=Path("templates"))
+
+    assert "DNS=192.168.2.1" in rendered
+
+
 def test_render_assets_include_container_network_and_volume() -> None:
     inventory = load_inventory(Path("examples/staff/team.yml"))
     instance = inventory.instances[0]

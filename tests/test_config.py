@@ -15,6 +15,31 @@ def test_load_example_inventory() -> None:
         assert instance.team_definition_path.endswith("/role")
 
 
+def test_invalid_dns_server_is_rejected(tmp_path: Path) -> None:
+    config = tmp_path / "invalid-dns.yml"
+    config.write_text(
+        """
+cluster: {name: c, primary_host: local}
+hosts: [{name: local}]
+instances:
+  - name: one
+    host: local
+    role: developer
+    workspace_path: /srv/one/workspace
+    team_definition_path: /srv/one/role
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: example.invalid/openclaw, tag: "1"}
+    dns_servers: [not-an-address]
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="DNS server must be"):
+        load_inventory(config)
+
+
 def test_inventory_defaults_project_root_to_repository() -> None:
     inventory = load_inventory(Path("personal-team/team.yml"))
     repository_root = Path.cwd().resolve()
