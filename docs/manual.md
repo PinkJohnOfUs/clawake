@@ -1,7 +1,7 @@
 # Clawake-Betriebshandbuch
 
 Stand: 8. September 2026. Dieses Handbuch beschreibt die vorhandene CLI und beginnt
-mit dem realen Fall „WhatsApp für den Fokus-Partner“. Die gewünschte Weiterentwicklung
+mit dem realen Fall „WhatsApp für den Pflegebetreuer“. Die gewünschte Weiterentwicklung
 steht in der [User Journey](user_journey.md); Sicherheitsannahmen und Alternativen
 in der [Sicherheitsbewertung](security.md).
 
@@ -10,16 +10,16 @@ in der [Sicherheitsbewertung](security.md).
 Clawake verwaltet Images, Quadlets und den Lebenszyklus eines Mitglieds. OpenClaw
 verwaltet Modelle, Plugins, Kanäle und Gespräche. Auf dem Host läuft Clawake; Befehle
 zur OpenClaw-Konfiguration laufen im betreffenden Container. Ein OpenClaw-Mitglied
-wird mit seinem Inventarnamen ausgewählt, hier `fokus-partner`.
+wird mit seinem Inventarnamen ausgewählt, hier `pflegebetreuer`.
 
 Alle folgenden Clawake-Beispiele werden im Repository-Verzeichnis ausgeführt:
 
 ```bash
 make install-dev
 export CLAWAKE_PROJECT_ROOT="$PWD"
-uv run clawake validate -c personal-team/team.yml -m fokus-partner
-uv run clawake status -c personal-team/team.yml -m fokus-partner
-uv run clawake logs -c personal-team/team.yml -m fokus-partner -n 50
+uv run clawake validate -c personal-team/team.yml -m pflegebetreuer
+uv run clawake status -c personal-team/team.yml -m pflegebetreuer
+uv run clawake logs -c personal-team/team.yml -m pflegebetreuer -n 50
 ```
 
 `validate` prüft Schema, Rendering und Unterschiede zu installierten Dateien. Es
@@ -30,11 +30,11 @@ WhatsApp-Verbindung. Diagnoseausgaben können persönliche Inhalte enthalten.
 ## 2. Ein Mitglied bereitstellen und initialisieren
 
 ```bash
-uv run clawake setup -c personal-team/team.yml -m fokus-partner
-uv run clawake setup -c personal-team/team.yml -m fokus-partner --execute
-uv run clawake onboard -c personal-team/team.yml -m fokus-partner
-uv run clawake onboard -c personal-team/team.yml -m fokus-partner --execute
-uv run clawake dashboard -c personal-team/team.yml -m fokus-partner
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer --execute
+uv run clawake onboard -c personal-team/team.yml -m pflegebetreuer
+uv run clawake onboard -c personal-team/team.yml -m pflegebetreuer --execute
+uv run clawake dashboard -c personal-team/team.yml -m pflegebetreuer
 ```
 
 Vor `setup --execute` müssen die im Inventar referenzierten Teamdefinitionen und
@@ -44,6 +44,13 @@ Dienste neu – auch bei unveränderten Quadlets. Onboarding öffnet den interak
 OpenClaw-Assistenten im Container. Dort werden insbesondere Modellzugang und
 Laufzeiteinstellungen eingerichtet. Rolleninformationen stammen aus
 `/team-definition`; eine Rollenbeschreibung ersetzt keine technische Berechtigung.
+
+Beim ersten ausgeführten Setup nach der Umbenennung stoppt und deaktiviert Clawake
+`fokus-partner.service` und entfernt dessen alte Quadlet-Definitionen. Das neue Quadlet
+deklariert zusätzlich einen systemd-Konflikt mit diesem Altdienst und stoppt vor jedem
+Start einen eventuell separat laufenden Container `fokus-partner`. Persistente
+Workspace-Daten und historische Backups werden dabei nicht gelöscht. Damit können Alt-
+und Neuinstanz die Ports nicht parallel belegen.
 
 ## 3. Fall: WhatsApp-Plugin wird wegen der Plugin-API abgelehnt
 
@@ -57,7 +64,7 @@ but this OpenClaw runtime exposes 2026.8.2.
 Beim Vorfall am 7. September wurde lesend bestätigt:
 
 ```bash
-podman exec fokus-partner openclaw --version
+podman exec pflegebetreuer openclaw --version
 # OpenClaw 2026.8.2 (0965053)
 ```
 
@@ -82,7 +89,7 @@ ungeprüft auf 2026.8.2 übertragen werden.
 
 ## 4. Upgrade vorbereiten
 
-Die Browser-Variante beibehalten, sofern der Fokus-Partner weiterhin Browserwerkzeuge
+Die Browser-Variante beibehalten, sofern der Pflegebetreuer weiterhin Browserwerkzeuge
 benötigt. Vorab Release-Hinweise, Hostanforderungen und Plugin-Kompatibilität prüfen.
 Den tatsächlich veröffentlichten Tag und den zugehörigen **Image-Manifest-Digest**
 aus der [offiziellen Container-Registry](https://github.com/openclaw/openclaw/pkgs/container/openclaw)
@@ -94,7 +101,7 @@ enthalten hier keine behaupteten Zielwerte:
 ```bash
 : "${CLAWAKE_TARGET_TAG:?Setze den verifizierten Ziel-Tag inklusive Image-Variante}"
 : "${CLAWAKE_TARGET_DIGEST:?Setze den passenden sha256-Image-Digest}"
-uv run clawake upgrade -c personal-team/team.yml -m fokus-partner \
+uv run clawake upgrade -c personal-team/team.yml -m pflegebetreuer \
   --to "$CLAWAKE_TARGET_TAG" --digest "$CLAWAKE_TARGET_DIGEST"
 ```
 
@@ -116,11 +123,11 @@ wiederherstellbare Sicherungen unabhängig prüfen. Details im
 Nach geprüfter Zielversion und Sicherung:
 
 ```bash
-uv run clawake upgrade -c personal-team/team.yml -m fokus-partner \
+uv run clawake upgrade -c personal-team/team.yml -m pflegebetreuer \
   --to "${CLAWAKE_TARGET_TAG:?Ziel-Tag fehlt}" \
   --digest "${CLAWAKE_TARGET_DIGEST:?Ziel-Digest fehlt}" --execute
-uv run clawake status -c personal-team/team.yml -m fokus-partner
-podman exec fokus-partner openclaw --version
+uv run clawake status -c personal-team/team.yml -m pflegebetreuer
+podman exec pflegebetreuer openclaw --version
 ```
 
 Clawake prüft das Image, stoppt den Dienst, sichert nach Policy, führt Migrationen
@@ -135,17 +142,17 @@ gepinntes Inventar voneinander ab.
 Zuerst die in der gewählten Version verfügbaren Befehle und Plugins prüfen:
 
 ```bash
-podman exec fokus-partner openclaw plugins --help
-podman exec fokus-partner openclaw plugins list
-podman exec fokus-partner openclaw channels --help
+podman exec pflegebetreuer openclaw plugins --help
+podman exec pflegebetreuer openclaw plugins list
+podman exec pflegebetreuer openclaw channels --help
 ```
 
-Für den Fokus-Partner sind npm-Version und Registry-Integrität im Team-Inventar
+Für den Pflegebetreuer sind npm-Version und Registry-Integrität im Team-Inventar
 explizit gepinnt. Installation und Prüfung erfolgen deshalb über Clawake:
 
 ```bash
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner --execute
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer --execute
 ```
 
 Clawake lässt keine Tags oder Versionsbereiche zu. Nach der Installation prüft es die
@@ -158,9 +165,9 @@ Pairing bzw. ausdrücklich erlaubte Absender, begrenzte Gruppen und passende
 Werkzeugrechte. Anschließend mit der für die Zielversion bestätigten Syntax:
 
 ```bash
-podman exec -it fokus-partner openclaw channels login --channel whatsapp
-podman exec fokus-partner openclaw channels status --probe
-podman exec fokus-partner openclaw security audit
+podman exec -it pflegebetreuer openclaw channels login --channel whatsapp
+podman exec pflegebetreuer openclaw channels status --probe
+podman exec pflegebetreuer openclaw security audit
 ```
 
 QR-Verknüpfung des WhatsApp-Kontos und Freigabe eines Nachrichtensenders sind zwei

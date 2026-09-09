@@ -2,6 +2,9 @@
 Description=OpenClaw instance {{ instance.name }}
 After=network-online.target
 Wants=network-online.target
+{% for legacy_name in instance.legacy_names %}
+Conflicts={{ legacy_name }}.service
+{% endfor %}
 
 [Container]
 ContainerName={{ instance.container_name }}
@@ -41,6 +44,9 @@ Label={{ key }}={{ value }}
 {% endfor %}
 
 [Service]
+{% for legacy_name in instance.legacy_names %}
+ExecStartPre=-/usr/bin/podman stop {{ legacy_name }}
+{% endfor %}
 Restart=always
 TimeoutStartSec=120
 

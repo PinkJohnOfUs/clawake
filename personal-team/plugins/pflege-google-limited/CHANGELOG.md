@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-08
+
+- Add `pflege_drive_file_download` for read-only Drive downloads.
+- Export Google Docs, Sheets, Slides, and Drawings as PDF, XLSX, PPTX, and PNG.
+- Restrict writes to a configured download directory, default to a 25 MiB size limit,
+  use private file permissions, and refuse to overwrite an existing local file.
+- Keep the existing exact `drive.readonly` OAuth boundary; reauthorization is not required.
+
 ## [0.5.0] — 2026-09-08
 
 - Native Google-Konto dashboard page with host-browser OAuth on the existing gateway port.

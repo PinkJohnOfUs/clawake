@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getToolPluginMetadata } from "openclaw/plugin-sdk/tool-plugin";
-import plugin, { SCOPES, encodeRfc2822, expandHome } from "./index.js";
+import plugin, { SCOPES, driveDownloadFormat, encodeRfc2822, expandHome, safeDownloadName } from "./index.js";
 
 const expectedTools = [
   "pflege_google_auth_start",
@@ -17,6 +20,7 @@ const expectedTools = [
   "pflege_calendar_event_update",
   "pflege_drive_files_list",
   "pflege_drive_file_get",
+  "pflege_drive_file_download",
 ];
 
 const stateChangingTools = [
@@ -82,5 +86,79 @@ describe("pure helpers", () => {
 
   it("rejects email header injection", () => {
     expect(() => encodeRfc2822({ to: "a@example.test\r\nBcc: x@example.test", subject: "x", body: "x" })).toThrow(/line breaks/);
+  });
+
+  it("sanitizes Drive names supplied by Google", () => {
+    expect(safeDownloadName("quarter/report.pdf")).toBe("quarter_report.pdf");
+    expect(() => safeDownloadName("..")).toThrow(/usable name/);
+  });
+
+  it("uses direct downloads for regular Drive files", () => {
+    expect(driveDownloadFormat({ name: "photo.jpg", mimeType: "image/jpeg" })).toEqual({
+      fileName: "photo.jpg",
+      mimeType: "image/jpeg",
+      exported: false,
+    });
+  });
+
+  it("exports Google Workspace files to useful local formats", () => {
+    expect(driveDownloadFormat({
+      name: "Pflegeplan",
+      mimeType: "application/vnd.google-apps.document",
+    })).toEqual({ fileName: "Pflegeplan.pdf", mimeType: "application/pdf", exported: true });
+    expect(driveDownloadFormat({
+      name: "Termine",
+      mimeType: "application/vnd.google-apps.spreadsheet",
+    }).fileName).toBe("Termine.xlsx");
+  });
+});
+
+describe("Drive download tool", () => {
+  const directories: string[] = [];
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+  });
+
+  it("downloads bytes into the configured directory without changing Drive", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "pflege-drive-download-"));
+    directories.push(directory);
+    const tokenPath = join(directory, "token.json");
+    await writeFile(tokenPath, JSON.stringify({ access_token: "test-token", expiry_date: Date.now() + 3_600_000 }));
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: "drive-id",
+        name: "bericht.txt",
+        mimeType: "text/plain",
+        size: "5",
+        capabilities: { canDownload: true },
+      }), { headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("Hallo", { headers: { "content-length": "5" } }));
+    const registered: any[] = [];
+    plugin.register({
+      pluginConfig: {
+        credentialsPath: join(directory, "unused-credentials.json"),
+        tokenPath,
+        publicOrigin: "http://127.0.0.1:18989",
+        downloadDirectory: directory,
+        maxDownloadBytes: 100,
+      },
+      registerTool: (tool: unknown) => registered.push(tool),
+      registerGatewayMethod: () => {},
+      registerHttpRoute: () => {},
+    } as any);
+    const download = registered.find((tool) => tool.name === "pflege_drive_file_download");
+    const result = await download.execute("call-id", { fileId: "drive-id" });
+
+    expect(await readFile(join(directory, "bericht.txt"), "utf8")).toBe("Hallo");
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      fileId: "drive-id",
+      path: join(directory, "bericht.txt"),
+      bytes: 5,
+      exported: false,
+    });
+    expect(fetchMock.mock.calls[1][0].toString()).toContain("/drive/v3/files/drive-id?alt=media");
+    expect(fetchMock.mock.calls.every(([, init]) => init?.method !== "POST" && init?.method !== "PATCH")).toBe(true);
   });
 });

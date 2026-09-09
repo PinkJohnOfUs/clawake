@@ -137,6 +137,7 @@ class DashboardMeta(BaseModel):
 
 class InstanceSpec(BaseModel):
     name: str
+    legacy_names: list[str] = Field(default_factory=list)
     host: str
     role: Literal["product_owner", "developer"]
     workspace_path: str
@@ -184,8 +185,21 @@ class InstanceSpec(BaseModel):
                     raise ValueError(f"Invalid tool id in agent_tool_allow: '{tool}'")
         return value
 
+    @field_validator("legacy_names")
+    @classmethod
+    def validate_legacy_names(cls, values: list[str]) -> list[str]:
+        unit_name_pattern = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.@-]*$")
+        if len(values) != len(set(values)):
+            raise ValueError("legacy_names must be unique")
+        for value in values:
+            if not unit_name_pattern.fullmatch(value):
+                raise ValueError(f"Invalid legacy instance name: '{value}'")
+        return values
+
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:
+        if self.name in self.legacy_names:
+            raise ValueError(f"instances[{self.name}].legacy_names must not include its name")
         quadlet = Path(self.quadlet_path)
         if quadlet.suffix != ".container":
             raise ValueError(

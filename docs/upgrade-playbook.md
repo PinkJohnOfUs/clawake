@@ -1,7 +1,7 @@
 # Upgrade-Playbook
 
 Ein Upgrade ist ein kontrollierter, mehrstufiger Ablauf, **keine atomare Transaktion**.
-Den konkreten WhatsApp/API-Konflikt des Fokus-Partners erklärt das
+Den konkreten WhatsApp/API-Konflikt des Pflegebetreuers erklärt das
 [Betriebshandbuch](manual.md). Stand: 7. September 2026.
 
 ## Ziel auswählen und Vorschau prüfen
@@ -15,7 +15,7 @@ Vom Repository-Verzeichnis aus:
 
 ```bash
 export CLAWAKE_PROJECT_ROOT="$PWD"
-uv run clawake upgrade -c personal-team/team.yml -m fokus-partner \
+uv run clawake upgrade -c personal-team/team.yml -m pflegebetreuer \
   --to "${CLAWAKE_TARGET_TAG:?Verifizierten Ziel-Tag setzen}" \
   --digest "${CLAWAKE_TARGET_DIGEST:?Passenden Image-Digest setzen}"
 ```
@@ -42,7 +42,7 @@ konfigurierte Aufbewahrungszahl, im persönlichen Inventar sieben.
 ## Ausführen
 
 ```bash
-uv run clawake upgrade -c personal-team/team.yml -m fokus-partner \
+uv run clawake upgrade -c personal-team/team.yml -m pflegebetreuer \
   --to "${CLAWAKE_TARGET_TAG:?Ziel-Tag fehlt}" \
   --digest "${CLAWAKE_TARGET_DIGEST:?Ziel-Digest fehlt}" --execute
 ```
@@ -81,7 +81,7 @@ geänderten Zustand hinterlassen.
 Es existiert noch kein `clawake rollback`-Befehl.
 
 1. Den tatsächlichen Dienstzustand prüfen und einen laufenden fehlerhaften Dienst
-   mit `systemctl --user stop fokus-partner.service` stoppen.
+   mit `systemctl --user stop pflegebetreuer.service` stoppen.
 2. Fehlgeschlagenen Datenstand bei Bedarf separat sichern und Journal prüfen.
 3. Die ausgewählte vertrauenswürdige Sicherung in ein **separates** Verzeichnis
    entpacken; Archivstruktur, Vollständigkeit und Dateirechte prüfen. Der Backup-Code
@@ -90,7 +90,7 @@ Es existiert noch kein `clawake rollback`-Befehl.
    Nicht blind das ganze Team-Inventar zurückkopieren: Es kann inzwischen Änderungen
    an anderen Mitgliedern enthalten. Secret-Dateien bei Bedarf separat wiederherstellen.
 5. `validate` und Setup-Vorschau für das Mitglied prüfen; erst dann
-   `setup -c personal-team/team.yml -m fokus-partner --execute` ausführen.
+   `setup -c personal-team/team.yml -m pflegebetreuer --execute` ausführen.
 6. Runtime, Anwendungszustand und Kanäle überprüfen. Setup startet bereits neu;
    ein zusätzlicher Restart ist nicht erforderlich.
 

@@ -12,7 +12,7 @@ Zustand und keine Quelle für Änderungen.
 ## Clawake-Release bauen
 
 Das Build verwendet dieselbe per Digest gepinnte OpenClaw-Container-Version wie der
-Fokus-Partner. Nach einer Versionsänderung zuerst `package.json` und Lockfile prüfen,
+Pflegebetreuer. Nach einer Versionsänderung zuerst `package.json` und Lockfile prüfen,
 Build und Tests in einem kurzlebigen Container ausführen und das Archiv über
 `openclaw plugins pack` erzeugen. Das Pack-Kommando überschreibt keine vorhandenen
 Dateien; jeder Build bekommt deshalb einen neuen eindeutigen Release-Namen.
@@ -22,8 +22,8 @@ Das erzeugte Archiv wird zusammen mit seinem `sha256:`-Wert in
 
 ```bash
 uv run clawake validate -c personal-team/team.yml
-uv run clawake setup -c personal-team/team.yml -m fokus-partner
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer
 ```
 
 Erst die beiden erfolgreichen Vorschauen mit `--execute` anwenden. Der Quellcode,
@@ -58,8 +58,10 @@ Es gibt bewusst kein Werkzeug zum Löschen von Kalendereinträgen.
 
 - Dateien und Ordner suchen und auflisten
 - Metadaten einzelner Dateien lesen
+- Binärdateien herunterladen
+- Google Docs, Sheets, Slides und Drawings als PDF, XLSX, PPTX bzw. PNG exportieren
 
-Drive-Zugriff ist technisch auf Lesen begrenzt. Das Plugin kann keine Dateien hochladen, verändern, freigeben oder löschen und lädt keine Dateiinhalte herunter.
+Drive-Zugriff ist technisch auf Lesen begrenzt. Das Plugin kann keine Dateien hochladen, verändern, freigeben oder löschen. Downloads werden standardmäßig unter `~/.openclaw/downloads` abgelegt, sind auf 25 MiB pro Datei begrenzt und überschreiben keine vorhandenen Dateien.
 
 ## OAuth-Berechtigungen
 
@@ -100,6 +102,7 @@ Drive:
 
 - `pflege_drive_files_list`
 - `pflege_drive_file_get`
+- `pflege_drive_file_download`
 
 E-Mail-Versand, Gmail-Änderungen, Verschieben in den Papierkorb sowie das Erstellen oder Ändern von Terminen sind externe Zustandsänderungen. In der vorgesehenen Pflegebetreuer-Rolle benötigen sie vor jedem konkreten Aufruf eine Freigabe für Inhalt und Ziel. Diese Freigaberegel ist derzeit organisatorisch in Rollen- und Toolbeschreibungen verankert, nicht als zusätzliche technische Bestätigungsschicht im Plugin.
 
@@ -202,6 +205,7 @@ Nach der Einrichtung zuerst ausschließlich Lesezugriffe prüfen:
 - maximal eine Gmail-Nachrichten-ID auflisten
 - Kalenderereignisse in einem kleinen Zeitraum auflisten
 - maximal einen Drive-Metadatensatz auflisten
+- eine kleine, unkritische Drive-Datei herunterladen und den zurückgegebenen Pfad prüfen
 
 Senden, Verschieben in den Papierkorb sowie Kalender-Erstellen oder -Ändern nicht als Smoke-Test ausführen. Dafür ist ein konkreter, ausdrücklich freigegebener Testvorgang erforderlich.
 
@@ -241,7 +245,7 @@ Die ausgegebene SHA-256-Prüfsumme vor der Aktivierung kontrollieren. Das Packen
 - **Autorisierungscode:** `pflege_google_auth_complete` lehnt Aufrufe ab. Der Codeaustausch erfolgt ausschließlich im Backend des browsergebundenen OAuth-Ablaufs.
 - **Google-Testmodus:** Bleibt die OAuth-Anwendung im Status `Testing`, können Refresh-Tokens abhängig von Googles Richtlinien nach kurzer Zeit, häufig nach sieben Tagen, ungültig werden. Für dauerhaften Betrieb müssen Veröffentlichungsstatus und Google-Anforderungen separat geprüft werden.
 - **Freigaben vor Schreibaktionen:** Die Zustimmungspflicht ist derzeit eine Verfahrensregel. Eine zusätzliche technische Bestätigungsschicht pro Schreib- oder Löschaufruf wäre robuster.
-- **Drive-Inhalte:** Das Plugin liest nur Drive-Metadaten. Inhalte von PDFs, Google Docs, Tabellen oder anderen Dateien werden nicht heruntergeladen oder ausgewertet.
+- **Drive-Downloads:** Dateien werden lokal unter `downloadDirectory` gespeichert. Google-Workspace-Dateien werden in feste Standardformate exportiert. Pro Datei gilt `maxDownloadBytes` (standardmäßig 25 MiB); vorhandene Dateien werden nicht überschrieben.
 - **Container-Netzwerk:** Die native Anmeldung nutzt den vorhandenen Gateway-Port; der alte separate Helfer benötigt weiterhin seine eigene Netzwerk-Konfiguration.
 - **Paketmetadaten:** `package.json` enthält noch Namen, Autor und Repository des ursprünglichen Community-Plugins. Vor einer Veröffentlichung oder Weitergabe müssen diese Angaben auf das lokale Projekt angepasst und die Lizenz-/Urheberhinweise sauber erhalten werden.
 - **Lokales Artefakt:** Die Installation stammt aus einem lokal geprüften Artefakt und besitzt keine ClawHub-Provenienz. Für Updates müssen Quellcode, Tests und SHA-256 erneut geprüft werden.

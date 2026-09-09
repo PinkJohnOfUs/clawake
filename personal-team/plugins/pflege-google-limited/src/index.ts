@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir, rename, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, extname, resolve } from "node:path";
 import { Type } from "typebox";
 import { defineToolPlugin, type DefinedToolPluginEntry } from "openclaw/plugin-sdk/tool-plugin";
 import { registerWebOAuth } from "./oauth-web.js";
@@ -243,6 +243,75 @@ interface GoogleRequestOptions {
   body?: unknown;
 }
 
+interface DriveFileMetadata {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  md5Checksum?: string;
+  capabilities?: { canDownload?: boolean };
+}
+
+const GOOGLE_WORKSPACE_EXPORTS: Record<string, { mimeType: string; extension: string }> = {
+  "application/vnd.google-apps.document": { mimeType: "application/pdf", extension: ".pdf" },
+  "application/vnd.google-apps.spreadsheet": {
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    extension: ".xlsx",
+  },
+  "application/vnd.google-apps.presentation": {
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    extension: ".pptx",
+  },
+  "application/vnd.google-apps.drawing": { mimeType: "image/png", extension: ".png" },
+};
+
+export function safeDownloadName(name: string): string {
+  const sanitized = name.replace(/[\\/\0]/g, "_").trim();
+  if (!sanitized || sanitized === "." || sanitized === "..") {
+    throw new Error("Drive download filename must contain a usable name");
+  }
+  return sanitized;
+}
+
+function requestedDownloadName(name: string): string {
+  const safeName = safeDownloadName(name);
+  if (safeName !== name.trim()) {
+    throw new Error("Drive download filename must not contain directory separators or NUL bytes");
+  }
+  return safeName;
+}
+
+export function driveDownloadFormat(metadata: Pick<DriveFileMetadata, "name" | "mimeType">): {
+  mimeType: string;
+  fileName: string;
+  exported: boolean;
+} {
+  const exportFormat = GOOGLE_WORKSPACE_EXPORTS[metadata.mimeType];
+  const safeName = safeDownloadName(metadata.name);
+  if (!exportFormat) return { mimeType: metadata.mimeType, fileName: safeName, exported: false };
+  const fileName = extname(safeName).toLowerCase() === exportFormat.extension
+    ? safeName
+    : `${safeName}${exportFormat.extension}`;
+  return { mimeType: exportFormat.mimeType, fileName, exported: true };
+}
+
+async function authorizedGoogleRequest(
+  config: AuthConfig,
+  url: URL,
+  init: Omit<RequestInit, "headers"> & { headers?: Record<string, string> } = {},
+): Promise<Response> {
+  const request = async (forceRefresh: boolean): Promise<Response> => fetchWithTimeout(url, {
+    ...init,
+    headers: {
+      ...init.headers,
+      authorization: `Bearer ${await accessToken(config, forceRefresh)}`,
+    },
+  });
+  let response = await request(false);
+  if (response.status === 401) response = await request(true);
+  return response;
+}
+
 async function googleRequest<T>(
   config: AuthConfig,
   operation: string,
@@ -253,20 +322,42 @@ async function googleRequest<T>(
   for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
-  const request = async (forceRefresh: boolean): Promise<Response> => {
-    const headers: Record<string, string> = {
-      authorization: `Bearer ${await accessToken(config, forceRefresh)}`,
-    };
-    if (options.body !== undefined) headers["content-type"] = "application/json";
-    return fetchWithTimeout(url, {
-      method: options.method ?? "GET",
-      headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    });
-  };
-  let response = await request(false);
-  if (response.status === 401) response = await request(true);
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined) headers["content-type"] = "application/json";
+  const response = await authorizedGoogleRequest(config, url, {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
   return parseGoogleResponse<T>(response, operation);
+}
+
+async function readBoundedBody(response: Response, maximumBytes: number, operation: string): Promise<Buffer> {
+  if (!response.ok) return parseGoogleResponse<never>(response, operation);
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
+    await response.body?.cancel();
+    throw new Error(`${operation} exceeds the configured ${maximumBytes}-byte download limit`);
+  }
+  if (!response.body) return Buffer.alloc(0);
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maximumBytes) {
+        await reader.cancel();
+        throw new Error(`${operation} exceeds the configured ${maximumBytes}-byte download limit`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }
 
 export interface Rfc2822Args {
@@ -319,6 +410,16 @@ const configSchema = Type.Object(
       default: "http://127.0.0.1:18989",
       description: "Exact browser origin; HTTP only on localhost, otherwise HTTPS. No path.",
     }),
+    downloadDirectory: Type.String({
+      default: "~/.openclaw/downloads",
+      description: "Directory where downloaded Drive files are stored.",
+    }),
+    maxDownloadBytes: Type.Integer({
+      minimum: 1,
+      maximum: 104857600,
+      default: 26214400,
+      description: "Maximum size of one Drive download in bytes (up to 100 MiB).",
+    }),
   },
   { additionalProperties: false },
 );
@@ -328,7 +429,7 @@ const APPROVAL = "This state-changing action requires concrete user approval for
 const toolPlugin = defineToolPlugin({
   id: "pflege-google-limited",
   name: "Pflege Google Limited",
-  description: "Limited Google integration using native fetch and fs: Gmail read/send/manage, Calendar read/create/update, and Drive metadata read-only.",
+  description: "Limited Google integration using native fetch and fs: Gmail read/send/manage, Calendar read/create/update, and read-only Drive access including downloads.",
   configSchema,
   tools: (tool) => [
     tool({
@@ -576,6 +677,52 @@ const toolPlugin = defineToolPlugin({
           `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
           { query: { fields: "id,name,mimeType,modifiedTime,createdTime,webViewLink,parents,size,owners(displayName,emailAddress),trashed" } },
         );
+      },
+    }),
+    tool({
+      name: "pflege_drive_file_download",
+      label: "Download Drive file (read-only)",
+      description: "Download one Google Drive file into the configured local download directory without changing Drive. Google Docs, Sheets, Slides, and Drawings are exported as PDF, XLSX, PPTX, and PNG respectively.",
+      parameters: Type.Object({
+        fileId: Type.String(),
+        fileName: Type.Optional(Type.String({ description: "Optional local filename; directory components are not allowed." })),
+      }),
+      async execute({ fileId, fileName }, config) {
+        const auth = authConfig(config);
+        const metadata = await googleRequest<DriveFileMetadata>(
+          auth,
+          "Drive file download metadata",
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+          { query: { fields: "id,name,mimeType,size,md5Checksum,capabilities(canDownload)" } },
+        );
+        if (metadata.capabilities?.canDownload === false) {
+          throw new Error(`Drive file '${metadata.name}' does not permit downloading`);
+        }
+        const format = driveDownloadFormat(metadata);
+        const maximumBytes = config.maxDownloadBytes ?? 26_214_400;
+        if (metadata.size !== undefined && Number(metadata.size) > maximumBytes) {
+          throw new Error(`Drive file download exceeds the configured ${maximumBytes}-byte download limit`);
+        }
+        const suffix = format.exported ? "/export" : "";
+        const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}${suffix}`);
+        if (format.exported) url.searchParams.set("mimeType", format.mimeType);
+        else url.searchParams.set("alt", "media");
+        const response = await authorizedGoogleRequest(auth, url);
+        const contents = await readBoundedBody(response, maximumBytes, "Drive file download");
+        const localName = fileName === undefined ? format.fileName : requestedDownloadName(fileName);
+        const downloadDirectory = expandHome(config.downloadDirectory ?? "~/.openclaw/downloads");
+        await mkdir(downloadDirectory, { recursive: true, mode: 0o700 });
+        const destinationPath = resolve(downloadDirectory, localName);
+        await writeFile(destinationPath, contents, { flag: "wx", mode: 0o600 });
+        return {
+          fileId: metadata.id,
+          sourceName: metadata.name,
+          path: destinationPath,
+          mimeType: format.mimeType,
+          bytes: contents.byteLength,
+          exported: format.exported,
+          md5Checksum: metadata.md5Checksum,
+        };
       },
     }),
   ],

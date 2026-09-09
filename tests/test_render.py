@@ -31,7 +31,7 @@ def test_render_contains_expected_container_data() -> None:
 
 def test_render_includes_explicit_dns_servers() -> None:
     inventory = load_inventory(Path("personal-team/team.yml"))
-    instance = next(item for item in inventory.instances if item.name == "fokus-partner")
+    instance = next(item for item in inventory.instances if item.name == "pflegebetreuer")
 
     rendered = render_instance(instance, template_root=Path("templates"))
     google = next(plugin for plugin in instance.plugins if plugin.id == "pflege-google-limited")
@@ -41,6 +41,8 @@ def test_render_includes_explicit_dns_servers() -> None:
         f"Volume={google.artifact_path}:/opt/clawake/plugins/pflege-google-limited.tgz:ro"
     ) in rendered
     assert "@openclaw/whatsapp" not in rendered
+    assert "Conflicts=fokus-partner.service" in rendered
+    assert "ExecStartPre=-/usr/bin/podman stop fokus-partner" in rendered
 
 
 def test_render_assets_include_container_network_and_volume() -> None:

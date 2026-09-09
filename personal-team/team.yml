@@ -86,13 +86,15 @@ instances:
       description: Coacht wertschatzend und motiviert ohne Druck
       tags: [coaching, reflexion, motivation]
 
-  - name: fokus-partner
+  - name: pflegebetreuer
+    legacy_names:
+      - fokus-partner
     host: local
     role: developer
-    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/fokus
-    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/fokus
-    quadlet_path: fokus-partner.container
-    container_name: fokus-partner
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/pflegebetreuer
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/pflegebetreuer
+    quadlet_path: pflegebetreuer.container
+    container_name: pflegebetreuer
     image:
       repository: ghcr.io/openclaw/openclaw
       tag: "2026.9.2-browser"
@@ -109,7 +111,7 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/fokus.env
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/pflegebetreuer.env
     # The host uses systemd-resolved's loopback stub, which aardvark-dns cannot
     # forward reliably from its network namespace. Use the LAN resolver directly.
     dns_servers:
@@ -120,14 +122,16 @@ instances:
         integrity: sha512-vOWQIk7FpLHrhMmO+FaLi+pnFB82hiWNJJFJONkBuofERh2SMEz7EMut/vECFFEjFnmOZSVlYfRlxhbNkd/R6g==
         enabled: true
       - id: pflege-google-limited
-        artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-google-limited/releases/pflege-google-limited-0.5.0-openclaw-2026.9.2.tgz
-        sha256: sha256:9089f446331e93cee7ba786800621573f2bfc9b50bfe319e6749787341dc1d4e
+        artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-google-limited/releases/pflege-google-limited-0.6.0-openclaw-2026.9.2.tgz
+        sha256: sha256:f38bb31ac096b10f58b95ae62e8db1f492ded7e8870a1391de41439c7e3b3597
         enabled: true
         custom_ui: true
         config:
           credentialsPath: /home/node/.openclaw/secrets/pflege-google-web-credentials.json
           tokenPath: /home/node/.openclaw/secrets/pflege-google-web-token.json
           publicOrigin: http://127.0.0.1:18989
+          downloadDirectory: /home/node/.openclaw/downloads
+          maxDownloadBytes: 26214400
       - id: pflege-vault
         artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-vault/releases/pflege-vault-0.1.0-openclaw-2026.9.2.tgz
         sha256: sha256:5ae4df070439ac2a7bcd281fe4c3f8c8d70efb41bb57a59180ecde58b5e59a9f

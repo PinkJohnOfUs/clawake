@@ -1,8 +1,8 @@
 {
   "id": "pflege-google-limited",
   "name": "Pflege Google Limited",
-  "description": "Limited Google integration using native fetch and fs: Gmail read/send/manage, Calendar read/create/update, and Drive metadata read-only.",
-  "version": "0.5.0",
+  "description": "Limited Google integration using native fetch and fs: Gmail read/send/manage, Calendar read/create/update, and read-only Drive access including downloads.",
+  "version": "0.6.0",
   "enabledByDefault": false,
   "activation": {
     "onStartup": true
@@ -12,7 +12,9 @@
     "required": [
       "credentialsPath",
       "tokenPath",
-      "publicOrigin"
+      "publicOrigin",
+      "downloadDirectory",
+      "maxDownloadBytes"
     ],
     "properties": {
       "credentialsPath": {
@@ -29,6 +31,18 @@
         "type": "string",
         "default": "http://127.0.0.1:18989",
         "description": "Exact browser origin; HTTP only on localhost, otherwise HTTPS. No path."
+      },
+      "downloadDirectory": {
+        "type": "string",
+        "default": "~/.openclaw/downloads",
+        "description": "Directory where downloaded Drive files are stored."
+      },
+      "maxDownloadBytes": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 104857600,
+        "default": 26214400,
+        "description": "Maximum size of one Drive download in bytes (up to 100 MiB)."
       }
     },
     "additionalProperties": false
@@ -50,7 +64,8 @@
       "pflege_calendar_event_create",
       "pflege_calendar_event_update",
       "pflege_drive_files_list",
-      "pflege_drive_file_get"
+      "pflege_drive_file_get",
+      "pflege_drive_file_download"
     ]
   }
 }

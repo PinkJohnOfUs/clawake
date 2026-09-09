@@ -113,7 +113,7 @@ orchestration can build on this boundary without introducing a second runtime.
 
 ## Operations and security
 
-Start with the [operator manual](docs/manual.md), including the Fokus-Partner
+Start with the [operator manual](docs/manual.md), including the Pflegebetreuer
 WhatsApp/API mismatch and the upgrade-to-channel-setup workflow. The
 [user journey](docs/user_journey.md) distinguishes today's commands from the CLI
 vision: explain compatibility and access changes before applying a member-scoped plan.

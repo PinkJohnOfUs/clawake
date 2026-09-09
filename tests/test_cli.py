@@ -16,6 +16,7 @@ def _write_inventory(
     *,
     quadlet_root: Path | None = None,
     env_content: str = "OPENCLAW_GATEWAY_TOKEN=sample-token\n",
+    legacy_names: list[str] | None = None,
 ) -> tuple[Path, Path, Path]:
     workspace = tmp_path / "workspace"
     team_definition = tmp_path / "team.yml"
@@ -77,6 +78,8 @@ def _write_inventory(
             }
         ],
     }
+    if legacy_names:
+        data["instances"][0]["legacy_names"] = legacy_names
     inventory_file.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return inventory_file, env_file, workspace
 
@@ -320,6 +323,92 @@ def test_setup_quadlets_execute_starts_unchanged_service(
     assert second.exit_code == 0
     assert "ensuring selected services are running" in second.output
     assert RecordingSystemdService.restart_calls == 2
+
+
+def test_setup_quadlets_retires_legacy_service_before_restart(
+    monkeypatch: object, tmp_path: Path
+) -> None:
+    from clawake import cli
+
+    class RecordingSystemdService:
+        calls: list[tuple[str, str]] = []
+
+        def stop(self, instance_name: str, execute: bool = False) -> CommandResult:
+            self.calls.append(("stop", instance_name))
+            return CommandResult(["systemctl", "stop"], 0, "", "")
+
+        def disable(self, instance_name: str, execute: bool = False) -> CommandResult:
+            self.calls.append(("disable", instance_name))
+            return CommandResult(["systemctl", "disable"], 0, "", "")
+
+        def remove_quadlet(self, quadlet_path: str, execute: bool = False) -> CommandResult:
+            self.calls.append(("remove", Path(quadlet_path).name))
+            return CommandResult(["rm", quadlet_path], 0, "", "")
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            self.calls.append(("reload", ""))
+            return CommandResult(["systemctl", "daemon-reload"], 0, "", "")
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            self.calls.append(("restart", instance_name))
+            return CommandResult(["systemctl", "restart"], 0, "", "")
+
+    cfg, _env_file, _workspace = _write_inventory(
+        tmp_path,
+        quadlet_root=tmp_path / "quadlets",
+        legacy_names=["old-one"],
+    )
+    monkeypatch.setattr(cli, "SystemdService", RecordingSystemdService)
+
+    result = runner.invoke(app, ["setup", "--config", str(cfg), "--execute"])
+
+    assert result.exit_code == 0, result.output
+    assert RecordingSystemdService.calls == [
+        ("stop", "old-one"),
+        ("disable", "old-one"),
+        ("remove", "old-one.container"),
+        ("remove", "old-one.network"),
+        ("remove", "old-one-state.volume"),
+        ("reload", ""),
+        ("restart", "one"),
+    ]
+
+
+def test_setup_quadlets_preserves_legacy_artifacts_when_stop_fails(
+    monkeypatch: object, tmp_path: Path
+) -> None:
+    from clawake import cli
+
+    class FailedLegacyStop:
+        calls: list[tuple[str, str]] = []
+
+        def stop(self, instance_name: str, execute: bool = False) -> CommandResult:
+            self.calls.append(("stop", instance_name))
+            return CommandResult(["systemctl", "stop"], 1, "", "permission denied")
+
+        def disable(self, instance_name: str, execute: bool = False) -> CommandResult:
+            raise AssertionError("Must not disable after a failed stop")
+
+        def remove_quadlet(self, quadlet_path: str, execute: bool = False) -> CommandResult:
+            raise AssertionError("Must not remove artifacts after a failed stop")
+
+        def daemon_reload(self, execute: bool = False) -> CommandResult:
+            raise AssertionError("Must not reload after a failed legacy migration")
+
+        def restart(self, instance_name: str, execute: bool = False) -> CommandResult:
+            raise AssertionError("Must not restart after a failed legacy migration")
+
+    cfg, _env_file, _workspace = _write_inventory(
+        tmp_path,
+        quadlet_root=tmp_path / "quadlets",
+        legacy_names=["old-one"],
+    )
+    monkeypatch.setattr(cli, "SystemdService", FailedLegacyStop)
+
+    result = runner.invoke(app, ["setup", "--config", str(cfg), "--execute"])
+
+    assert result.exit_code == 1
+    assert FailedLegacyStop.calls == [("stop", "old-one")]
 
 
 def test_restart_quadlets_execute_propagates_failures(monkeypatch: object, tmp_path: Path) -> None:

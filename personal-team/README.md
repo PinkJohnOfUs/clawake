@@ -44,7 +44,7 @@ make doctor
 mkdir -p personal-team/env
 cp personal-team/env.example personal-team/env/navigator.env
 cp personal-team/env.example personal-team/env/coach.env
-cp personal-team/env.example personal-team/env/fokus.env
+cp personal-team/env.example personal-team/env/pflegebetreuer.env
 ```
 
 In jede Datei einen eigenen, langen `OPENCLAW_GATEWAY_TOKEN` eintragen und die
@@ -62,10 +62,10 @@ uv run clawake diagnose-dashboard -c personal-team/team.yml
 
 Der Quellcode von `pflege-google-limited` liegt versionierbar unter
 `personal-team/plugins/pflege-google-limited`. Das Inventar pinnt das gebaute Archiv
-mit SHA-256 für den Fokus-Partner. Zusätzlich wird das offizielle WhatsApp-Plugin als
+mit SHA-256 für den Pflegebetreuer. Zusätzlich wird das offizielle WhatsApp-Plugin als
 exakte npm-Version mit der vom Registry-Paket gelieferten SHA-512-Integrität verwaltet.
 Google-Credentials und Tokens bleiben ausschließlich
-im ignorierten Laufzeitverzeichnis `workspaces/fokus/.openclaw/secrets`.
+im ignorierten Laufzeitverzeichnis `workspaces/pflegebetreuer/.openclaw/secrets`.
 
 Das lokale Archiv `pflege-vault` ist ebenfalls SHA-256-gepinnt. Sein Ciphertext
 liegt unter `/home/node/.openclaw/pflege-vault/vault.json` auf dem persistenten
@@ -79,10 +79,10 @@ Archiv und dessen SHA-256 im Inventar prüfen und anschließend erst Quadlet und
 anwenden:
 
 ```bash
-uv run clawake setup -c personal-team/team.yml -m fokus-partner
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner
-uv run clawake setup -c personal-team/team.yml -m fokus-partner --execute
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner --execute
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer --execute
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer --execute
 ```
 
 `setup` bindet lokale, gepinnte Archive schreibgeschützt in den Container.

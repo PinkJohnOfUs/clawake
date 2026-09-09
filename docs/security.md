@@ -2,7 +2,7 @@
 
 Stand: 8. September 2026. Grundlage sind der Repository-Code, das persönliche
 Inventar und die unten jeweils verlinkten Herstellerdokumentationen. Die
-Fokus-Runtime wurde am 7. September von 2026.8.2 auf 2026.9.2-browser aktualisiert.
+Die Pflegebetreuer-Runtime wurde am 7. September von 2026.8.2 auf 2026.9.2-browser aktualisiert.
 Die Online-Dokumentation entwickelt sich weiter; ihre aktuellen Optionen sind kein
 Nachweis über die wirksame Konfiguration einer konkreten Runtime. Dies ist eine
 Architekturprüfung, kein Penetrationstest oder vollständiger Audit der laufenden
@@ -83,7 +83,7 @@ Podman kann ohne Rootrechte betrieben werden und unterstützt deklarativen Betri
 | Quadlet und Clawake | Machen Konfiguration und Betrieb wiederholbar und prüfbar | Fehlerhafte Regeln werden ebenfalls wiederholbar ausgerollt |
 | Backup und Recovery | Können Auswirkungen eines Fehlers begrenzen | Verhindern weder Datenabfluss noch ungewollte Nachrichten |
 
-## Konkrete Bedrohungen beim Fokus-Partner
+## Konkrete Bedrohungen beim Pflegebetreuer
 
 Die folgenden Aussagen sind unsere Bewertung des hiesigen Designs:
 

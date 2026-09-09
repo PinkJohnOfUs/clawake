@@ -202,6 +202,56 @@ def _is_tolerated_teardown_error(result: CommandResult) -> bool:
     return any(marker in details for marker in tolerated_markers)
 
 
+def _retire_legacy_services(
+    service: SystemdService,
+    instances: list[InstanceSpec],
+    *,
+    disable: bool,
+    quadlet_roots: dict[str, Path] | None = None,
+) -> bool:
+    """Stop legacy units before a renamed instance claims their runtime resources."""
+    failed = False
+    for instance in instances:
+        for legacy_name in instance.legacy_names:
+            typer.echo(f"Retiring legacy service {legacy_name}.service for {instance.name}")
+            stop_result = service.stop(legacy_name, execute=True)
+            _print_result(stop_result)
+            if (
+                stop_result.return_code != 0
+                and not _is_tolerated_teardown_error(stop_result)
+            ):
+                failed = True
+                continue
+
+            if disable:
+                disable_result = service.disable(legacy_name, execute=True)
+                _print_result(disable_result)
+                if (
+                    disable_result.return_code != 0
+                    and not _is_tolerated_teardown_error(disable_result)
+                ):
+                    failed = True
+                    continue
+
+            if quadlet_roots is not None:
+                root = quadlet_roots[instance.host]
+                for artifact in (
+                    f"{legacy_name}.container",
+                    f"{legacy_name}.network",
+                    f"{legacy_name}-state.volume",
+                ):
+                    remove_result = service.remove_quadlet(
+                        str(root / artifact), execute=True
+                    )
+                    _print_result(remove_result)
+                    if (
+                        remove_result.return_code != 0
+                        and not _is_tolerated_teardown_error(remove_result)
+                    ):
+                        failed = True
+    return not failed
+
+
 def _load_env_file_values(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path.exists() or not path.is_file():
@@ -493,7 +543,10 @@ def setup_quadlets(
 
     for change in changed_artifacts:
         typer.echo(f" - {change.member} [{change.role}] write {change.destination}")
-    typer.echo("  Apply: prepare runtime config, reload systemd, restart selected members.")
+    typer.echo(
+        "  Apply: retire legacy services, prepare runtime config, reload systemd, "
+        "restart selected members."
+    )
 
     if not execute:
         typer.echo("DRY RUN setup-quadlets complete. Re-run with --execute to mutate state.")
@@ -501,6 +554,17 @@ def setup_quadlets(
 
     service = SystemdService()
     failed = False
+
+    quadlet_roots = {
+        host.name: Path(host.quadlet_root).expanduser() for host in inventory.hosts
+    }
+    if not _retire_legacy_services(
+        service,
+        selected,
+        disable=True,
+        quadlet_roots=quadlet_roots,
+    ):
+        raise typer.Exit(code=1)
 
     # Podman requires bind-mount sources to exist before starting the unit.
     for instance in selected:
@@ -553,6 +617,8 @@ def restart_quadlets(
 
     service = SystemdService()
     failed = False
+    if execute and not _retire_legacy_services(service, selected, disable=False):
+        raise typer.Exit(code=1)
     for instance in selected:
         result = service.restart(instance.name, execute=execute)
         _print_result(result)

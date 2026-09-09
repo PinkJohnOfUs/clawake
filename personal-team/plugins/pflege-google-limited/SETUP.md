@@ -1,6 +1,6 @@
 # Version 0.5.0: Google im Dashboard verbinden
 
-Geprüfte Zielruntime: OpenClaw 2026.9.2, Container `fokus-partner`.
+Geprüfte Zielruntime: OpenClaw 2026.9.2, Container `pflegebetreuer`.
 Die neue native Seite heißt **Google-Konto**. Google öffnet in einem normalen
 Firefox-Tab; der OpenClaw-Container-Browser ist dafür nicht beteiligt.
 
@@ -20,8 +20,8 @@ Die Datei geschützt außerhalb des Workspace aufbewahren.
 Vom **Host-Terminal** kopieren; den Downloadpfad anpassen:
 
 ```bash
-podman cp /absoluter/pfad/zum/google-webclient.json fokus-partner:/home/node/.openclaw/secrets/pflege-google-web-credentials.json
-podman exec fokus-partner chmod 600 /home/node/.openclaw/secrets/pflege-google-web-credentials.json
+podman cp /absoluter/pfad/zum/google-webclient.json pflegebetreuer:/home/node/.openclaw/secrets/pflege-google-web-credentials.json
+podman exec pflegebetreuer chmod 600 /home/node/.openclaw/secrets/pflege-google-web-credentials.json
 ```
 
 Die neuen Dateinamen sind absichtlich getrennt: Ein Refresh-Token des alten
@@ -30,17 +30,21 @@ werden. Die bisherigen Credential- und Token-Dateien bleiben für einen Rollback
 
 ## 2. Plugin aktualisieren und konfigurieren
 
+Drive-Downloads landen standardmäßig in `/home/node/.openclaw/downloads`. Im
+Team-Inventar begrenzen `downloadDirectory` und `maxDownloadBytes` das Ziel und die
+Größe (aktuell 25 MiB je Datei). Der Download überschreibt keine vorhandene Datei.
+
 Quellcode und geprüftes Artefakt werden durch Clawake unter
 `personal-team/plugins/pflege-google-limited` verwaltet. Der SHA-256-Digest steht
 im Team-Inventar. Vor dem erstmaligen Clawake-Sync kann die installierte Version
 zusätzlich auf dem Host gesichert werden:
 
 ```bash
-podman cp fokus-partner:/home/node/.openclaw/extensions/pflege-google-limited ./pflege-google-limited-backup-0.4.0
-uv run clawake setup -c personal-team/team.yml -m fokus-partner
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner
-uv run clawake setup -c personal-team/team.yml -m fokus-partner --execute
-uv run clawake sync-plugins -c personal-team/team.yml -m fokus-partner --execute
+podman cp pflegebetreuer:/home/node/.openclaw/extensions/pflege-google-limited ./pflege-google-limited-backup-0.4.0
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer --execute
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer --execute
 ```
 
 Ein bereits vorhandenes Sicherungsverzeichnis nicht überschreiben; einen neuen Namen

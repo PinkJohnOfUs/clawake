@@ -1,7 +1,7 @@
 {
   "name": "@clawake/pflege-google-limited",
-  "version": "0.5.0",
-  "description": "Limited Google Gmail, Calendar, and read-only Drive tools for OpenClaw using native Node fetch and fs.",
+  "version": "0.6.0",
+  "description": "Limited Google Gmail, Calendar, and read-only Drive tools including downloads for OpenClaw using native Node fetch and fs.",
   "type": "module",
   "license": "MIT",
   "private": true,

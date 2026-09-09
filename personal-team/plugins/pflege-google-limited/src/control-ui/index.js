@@ -10,7 +10,7 @@ export default {
         const title = document.createElement("h2");
         title.textContent = "Google-Konto";
         const info = document.createElement("p");
-        info.textContent = "Verbinde das Google-Konto für Gmail, Kalender und Drive. Die Anmeldung öffnet sich in einem normalen Browser-Tab. Gmail kann gelesen, gesendet und verwaltet werden; Kalendertermine können erstellt und geändert werden. Drive-Metadaten werden nur gelesen.";
+        info.textContent = "Verbinde das Google-Konto für Gmail, Kalender und Drive. Die Anmeldung öffnet sich in einem normalen Browser-Tab. Gmail kann gelesen, gesendet und verwaltet werden; Kalendertermine können erstellt und geändert werden. Drive bleibt schreibgeschützt; Dateien können lokal heruntergeladen werden.";
         const status = document.createElement("p");
         status.setAttribute("role", "status");
         const callback = document.createElement("code");
