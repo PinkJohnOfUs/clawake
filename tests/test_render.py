@@ -29,6 +29,22 @@ def test_render_contains_expected_container_data() -> None:
     ) in rendered
 
 
+def test_render_includes_explicit_dns_servers() -> None:
+    inventory = load_inventory(Path("personal-team/team.yml"))
+    instance = next(item for item in inventory.instances if item.name == "pflegebetreuer")
+
+    rendered = render_instance(instance, template_root=Path("templates"))
+    google = next(plugin for plugin in instance.plugins if plugin.id == "pflege-google-limited")
+
+    assert "DNS=192.168.2.1" in rendered
+    assert (
+        f"Volume={google.artifact_path}:/opt/clawake/plugins/pflege-google-limited.tgz:ro"
+    ) in rendered
+    assert "@openclaw/whatsapp" not in rendered
+    assert "Conflicts=fokus-partner.service" in rendered
+    assert "ExecStartPre=-/usr/bin/podman stop fokus-partner" in rendered
+
+
 def test_render_assets_include_container_network_and_volume() -> None:
     inventory = load_inventory(Path("examples/staff/team.yml"))
     instance = inventory.instances[0]
@@ -44,6 +60,17 @@ def test_render_assets_include_container_network_and_volume() -> None:
     assert f"NetworkName={instance.container_name}" in network_text
     assert "[Volume]" in volume_text
     assert f"Options=device={instance.workspace_path}/.openclaw" in volume_text
+
+
+def test_browser_image_renders_writable_openclaw_cache_tmpfs() -> None:
+    inventory = load_inventory(Path("examples/staff/team.yml"))
+    instance = inventory.instances[0].model_copy(deep=True)
+    instance.image.tag = "2026.8.2-browser"
+
+    rendered = render_instance(instance, template_root=Path("templates"))
+
+    assert "Volume=" in rendered
+    assert "/.openclaw/cache/openclaw-1000:/home/node/.cache/openclaw-1000" in rendered
 
 
 def test_render_inventory_writes_all_quadlet_artifacts(tmp_path: Path) -> None:

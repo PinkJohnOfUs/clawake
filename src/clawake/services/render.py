@@ -5,6 +5,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from clawake.config import InstanceSpec, Inventory
+from clawake.services.runtime_upgrade import browser_cache_path, is_browser_image
 
 
 def image_ref(instance: InstanceSpec) -> str:
@@ -30,7 +31,12 @@ def render_instance(instance: InstanceSpec, template_root: Path) -> str:
 
 def render_instance_assets(instance: InstanceSpec, template_root: Path) -> dict[str, str]:
     env = _environment(template_root)
-    context = {"instance": instance, "image_ref": image_ref(instance)}
+    context = {
+        "instance": instance,
+        "image_ref": image_ref(instance),
+        "browser_image": is_browser_image(instance.image),
+        "browser_cache_path": browser_cache_path(instance),
+    }
     templates = {
         instance.quadlet_path: "quadlet/openclaw.container.j2",
         instance.network_quadlet_path: "quadlet/openclaw.network.j2",

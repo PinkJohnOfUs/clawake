@@ -1,3 +1,31 @@
 env/
-workspaces/*/.openclaw/
-workspaces/*/memory/
+
+# OpenClaw workspaces contain conversations, generated memory, uploads, exports,
+# credentials, and other local runtime data. Ignore everything by default and
+# allow only the reviewed, repository-owned agent definitions below.
+workspaces/*/*
+!workspaces/*/AGENTS.md
+!workspaces/*/IDENTITY.md
+!workspaces/*/SOUL.md
+!workspaces/*/USER.md
+!workspaces/*/MEMORY.md
+
+# Defence in depth for secret-bearing files, including accidental nested copies.
+workspaces/**/.openclaw/
+workspaces/**/memory/
+workspaces/**/DREAMS.md
+workspaces/**/HEARTBEAT.md
+workspaces/**/BOOTSTRAP.md
+workspaces/**/TOOLS.md
+workspaces/**/credentials/
+workspaces/**/uploads/
+workspaces/**/attachments/
+workspaces/**/exports/
+workspaces/**/*.env
+workspaces/**/*.env.*
+workspaces/**/*.secret
+workspaces/**/*.key
+workspaces/**/*.pem
+workspaces/**/*.p12
+workspaces/**/*.pfx
+workspaces/**/*.sqlite*

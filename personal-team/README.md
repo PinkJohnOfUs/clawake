@@ -12,6 +12,10 @@ Dieses Team besteht aus drei voneinander isolierten OpenClaw-Instanzen:
 - `setup-quadlets --execute` traegt die daraus abgeleiteten lokalen Dashboard-Origins
   idempotent in OpenClaws `gateway.controlUi.allowedOrigins` ein. Vorhandene Origins und
   bewusst gesetzte Authentifizierungsoptionen bleiben erhalten.
+- `setup-quadlets --execute`, `onboard-member --execute` und `upgrade --execute` gleichen
+  `agents.defaults.workspace` auf den im Container verwalteten Pfad `/workspace` ab.
+  Dadurch faellt OpenClaw nach Neustarts oder Migrationen nicht auf
+  `/home/node/.openclaw/workspace` zurueck.
 - Jede Instanz besitzt einen eigenen beschreibbaren Arbeitsbereich.
 - Rollendefinitionen werden schreibgeschuetzt eingebunden.
 - Es werden keine persoenlichen Ordner, SSH-Schluessel oder Host-Sockets gemountet.
@@ -24,10 +28,11 @@ Dieses Team besteht aus drei voneinander isolierten OpenClaw-Instanzen:
 Voraussetzungen: rootless Podman, systemd-Userdienste, `uv` und ein verfuegbares
 OpenClaw-Image. Im Repository:
 
-Das Team verwendet das oeffentlich abrufbare Basisimage
-`ghcr.io/openclaw/openclaw:2026.7.1-2`, zusaetzlich fest auf den geprueften
-Image-Digest gepinnt. Das private Beispielimage `openclaw-staff` ist nicht
-erforderlich.
+Das Team verwendet oeffentlich abrufbare OpenClaw-Images der Version `2026.8.2`,
+zusaetzlich fest auf gepruefte Image-Digests gepinnt. Der Alltags-Navigator nutzt
+die offizielle `2026.8.2-browser`-Variante mit Chromium und Playwright; die anderen
+Mitglieder verwenden das Standardimage. Das private Beispielimage `openclaw-staff`
+ist nicht erforderlich.
 
 ```bash
 # Auf CachyOS/Arch einmalig (auf diesem System fehlen uv und Podman noch):
@@ -39,7 +44,7 @@ make doctor
 mkdir -p personal-team/env
 cp personal-team/env.example personal-team/env/navigator.env
 cp personal-team/env.example personal-team/env/coach.env
-cp personal-team/env.example personal-team/env/fokus.env
+cp personal-team/env.example personal-team/env/pflegebetreuer.env
 ```
 
 In jede Datei einen eigenen, langen `OPENCLAW_GATEWAY_TOKEN` eintragen und die
@@ -52,6 +57,55 @@ uv run clawake setup-quadlets -c personal-team/team.yml --execute
 uv run clawake status-quadlets -c personal-team/team.yml
 uv run clawake diagnose-dashboard -c personal-team/team.yml
 ```
+
+## Verwaltete Plugins
+
+Der Quellcode von `pflege-google-limited` liegt versionierbar unter
+`personal-team/plugins/pflege-google-limited`. Das Inventar pinnt das gebaute Archiv
+mit SHA-256 für den Pflegebetreuer. Zusätzlich wird das offizielle WhatsApp-Plugin als
+exakte npm-Version mit der vom Registry-Paket gelieferten SHA-512-Integrität verwaltet.
+Google-Credentials und Tokens bleiben ausschließlich
+im ignorierten Laufzeitverzeichnis `workspaces/pflegebetreuer/.openclaw/secrets`.
+
+Das lokale Archiv `pflege-vault` ist ebenfalls SHA-256-gepinnt. Sein Ciphertext
+liegt unter `/home/node/.openclaw/pflege-vault/vault.json` auf dem persistenten
+OpenClaw-State-Mount. Der AES-Schlüssel wird ausschließlich als geschütztes,
+write-only Secret `PFLEGE_VAULT_MASTER_KEY` im OpenClaw Secret Store gehalten.
+`agent_tool_allow` gibt das optionale Tool nur für Agent `main` frei; zusätzlich
+verweigert das Plugin selbst jede andere `agentId`.
+
+Nach einer Quellcodeänderung das Plugin gemäß seiner README bauen und testen, das neue
+Archiv und dessen SHA-256 im Inventar prüfen und anschließend erst Quadlet und Plugin
+anwenden:
+
+```bash
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer
+uv run clawake setup -c personal-team/team.yml -m pflegebetreuer --execute
+uv run clawake sync-plugins -c personal-team/team.yml -m pflegebetreuer --execute
+```
+
+`setup` bindet lokale, gepinnte Archive schreibgeschützt in den Container.
+`sync-plugins` prüft bei Archiven Host und Read-only-Mount vor der Installation. Bei
+npm-Plugins akzeptiert es nur eine exakte Version und gleicht nach der Installation
+`resolvedSpec` sowie die SHA-512-Integrität mit dem Inventar ab. Danach setzt es die
+deklarierte Plugin-Konfiguration ohne Ausgabe ihres Inhalts und startet die Instanz
+neu. Das Akzeptieren der Plugin-Fähigkeiten ist damit an den jeweiligen Pin gebunden.
+Deklarierte `agent_tool_allow`-Einträge werden als per-Agent-`tools.alsoAllow`
+angewendet. Clawake merkt sich ausschließlich seine eigenen Ergänzungen in einer
+lokalen Statusdatei, damit entfernte Freigaben beim nächsten Sync entzogen werden,
+ohne manuell gepflegte Tool-Freigaben zu überschreiben.
+
+Ein neues Vault-Secret kann ohne Chat und ohne Kommandozeilenargument direkt im
+lokalen Dashboard unter `Settings -> Secrets` angelegt werden. Typ `Protected
+secret` wählen und keine Egress-Hosts eintragen; der Schlüssel dient ausschließlich
+als Config-SecretRef.
+
+In `plugins[].config` gehören nur nicht geheime Werte oder Verweise auf OpenClaw-
+Secrets, niemals Token oder Passwörter. Das Git-Repository sichert Quellcode und
+Deployment-Rezept. Die Dateien unter `.openclaw/secrets` benötigen unabhängig davon
+eine verschlüsselte, zugriffsgeschützte Sicherung; sie werden bewusst nicht in Git
+aufgenommen.
 
 Zum Kennenlernen zuerst nur den Navigator starten:
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -35,8 +37,68 @@ def _find_instance(config: dict, instance_name: str) -> dict:
     raise ValueError(f"Unknown instance '{instance_name}'")
 
 
-def _write_config(config_path: Path, config: dict) -> None:
-    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+def _format_image_value(key: str, value: str) -> str:
+    return json.dumps(value) if key.endswith("tag") else value
+
+
+def _update_image_fields(config_path: Path, instance_name: str, updates: dict[str, str]) -> None:
+    """Update one image mapping without reformatting the rest of the YAML document."""
+    lines = config_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    instance_pattern = re.compile(r"^(\s*)-\s+name:\s*" + re.escape(instance_name) + r"\s*$")
+    instance_start = next(
+        (index for index, line in enumerate(lines) if instance_pattern.match(line.rstrip("\n"))),
+        None,
+    )
+    if instance_start is None:
+        raise ValueError(f"Unknown instance '{instance_name}'")
+
+    instance_indent = len(lines[instance_start]) - len(lines[instance_start].lstrip())
+    instance_end = len(lines)
+    for index in range(instance_start + 1, len(lines)):
+        stripped = lines[index].lstrip()
+        indent = len(lines[index]) - len(stripped)
+        if indent == instance_indent and stripped.startswith("- name:"):
+            instance_end = index
+            break
+
+    image_index = next(
+        (
+            index
+            for index in range(instance_start + 1, instance_end)
+            if lines[index].strip() == "image:"
+        ),
+        None,
+    )
+    if image_index is None:
+        raise ValueError(f"Instance '{instance_name}' does not define image")
+
+    image_indent = len(lines[image_index]) - len(lines[image_index].lstrip())
+    child_indent = image_indent + 2
+    image_end = instance_end
+    positions: dict[str, int] = {}
+    field_pattern = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*):")
+    for index in range(image_index + 1, instance_end):
+        stripped = lines[index].lstrip()
+        if stripped and len(lines[index]) - len(stripped) <= image_indent:
+            image_end = index
+            break
+        match = field_pattern.match(lines[index])
+        if match and len(match.group(1)) == child_indent:
+            positions[match.group(2)] = index
+
+    for key, value in updates.items():
+        rendered = f"{' ' * child_indent}{key}: {_format_image_value(key, value)}\n"
+        if key in positions:
+            lines[positions[key]] = rendered
+        else:
+            lines.insert(image_end, rendered)
+            image_end += 1
+            positions = {
+                existing_key: existing_index + (1 if existing_index >= image_end - 1 else 0)
+                for existing_key, existing_index in positions.items()
+            }
+
+    config_path.write_text("".join(lines), encoding="utf-8")
 
 
 def _plan_from_image(
@@ -77,12 +139,15 @@ def apply_upgrade(
 
     plan = _plan_from_image(instance_name, image, next_tag, next_digest)
 
+    updates = {
+        "tag": plan.next_tag,
+        "digest": plan.next_digest,
+        "known_good_tag": image["tag"],
+    }
     if image.get("digest"):
-        image["known_good_digest"] = image["digest"]
-    image["tag"] = plan.next_tag
-    image["digest"] = plan.next_digest
+        updates["known_good_digest"] = image["digest"]
 
-    _write_config(config_path, config)
+    _update_image_fields(config_path, instance_name, updates)
     return plan
 
 
@@ -94,10 +159,17 @@ def rollback_to_known_good(config_path: Path, instance_name: str) -> UpgradePlan
     if not known_good:
         raise ValueError(f"Instance '{instance_name}' does not define image.known_good_digest")
 
-    plan = _plan_from_image(instance_name, image, image["tag"], known_good)
+    known_good_tag = image.get("known_good_tag")
+    if not known_good_tag:
+        raise ValueError(f"Instance '{instance_name}' does not define image.known_good_tag")
 
-    image["digest"] = known_good
-    _write_config(config_path, config)
+    plan = _plan_from_image(instance_name, image, known_good_tag, known_good)
+
+    _update_image_fields(
+        config_path,
+        instance_name,
+        {"tag": known_good_tag, "digest": known_good},
+    )
     return plan
 
 

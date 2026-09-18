@@ -61,9 +61,42 @@ def test_apply_upgrade_and_rollback(tmp_path: Path) -> None:
     rolled = rollback_to_known_good(config, PRODUCT_OWNER_INSTANCE)
     assert rolled.previous_digest == "sha256:new"
     assert rolled.next_digest == original_image["known_good_digest"]
+    assert rolled.next_tag == original_image["tag"]
+    rolled_image = _load_image(config, PRODUCT_OWNER_INSTANCE)
+    assert rolled_image["tag"] == original_image["tag"]
 
 
 def test_upgrade_plan_unknown_instance_raises() -> None:
     config = Path("examples/staff/team.yml")
     with pytest.raises(ValueError):
         build_upgrade_plan(config, "missing", next_tag=None, next_digest=None)
+
+
+def test_apply_upgrade_preserves_unrelated_yaml_formatting(tmp_path: Path) -> None:
+    config = tmp_path / "team.yml"
+    config.write_text(
+        """instances:
+  - name: one
+    image:
+      repository: ghcr.io/openclaw/openclaw
+      tag: "old"
+      digest: sha256:old
+    dashboard:
+      tags: [one, two]
+
+  - name: two
+    image:
+      repository: example.invalid/two
+      tag: "untouched"
+""",
+        encoding="utf-8",
+    )
+
+    apply_upgrade(config, "one", "new", "sha256:new")
+
+    updated = config.read_text(encoding="utf-8")
+    assert '      tag: "new"\n' in updated
+    assert '      known_good_tag: "old"\n' in updated
+    assert "      known_good_digest: sha256:old\n" in updated
+    assert "      tags: [one, two]\n" in updated
+    assert '      tag: "untouched"\n' in updated

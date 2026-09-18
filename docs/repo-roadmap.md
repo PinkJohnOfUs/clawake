@@ -1,61 +1,46 @@
 # Repository Roadmap
 
-## Validated Baseline (from tests)
+Stand: 7. September 2026. Die [User Journey](user_journey.md) beschreibt die gewünschte
+Erfahrung; die [Sicherheitsbewertung](security.md) begründet die Prioritäten.
 
-- CLI baseline coverage currently centers on `validate`, `apply` (dry-run/execute), and `status-cluster` (json) while lifecycle command migration is underway.
-- Config: inventory loading plus port/path collision checks are covered.
-- Rendering: Quadlet output includes expected image/labels/volumes.
-- Systemd wrapper: unsafe instance names are rejected.
-- Upgrade primitives: plan/apply/rollback behavior is covered.
+## Vorhandene Basis
 
-All current tests pass (`14 passed`).
+- Lokales Team-Inventar, Validierung und Quadlet-Rendering.
+- Schreibfreie Setup-Planung und explizite Anwendung.
+- `setup`, `restart`, `status`, `teardown`, `onboard`, `dashboard`, `validate`, `logs`;
+  bisherige lange Befehlsnamen bleiben verfügbar.
+- Mitgliedsbezogenes Upgrade mit Image-Prüfung, optionaler Sicherung, Migration und
+  Runtime-/Health-Prüfung; noch kein transaktionaler Rollback.
+- Tests mit temporären Dateien und simulierten Runtime-Adaptern. Sie ersetzen
+  keine Live-Abnahme der Sicherheits- und Wiederherstellungseigenschaften.
 
-## Phase 1 (current)
+## Priorität 1: Änderungen vorab verlässlich beurteilen
 
-- Declarative inventory and strict validation.
-- Quadlet rendering and deployment basics.
-- Systemd-user status/log inspection wrappers.
-- Team-centric lifecycle command model (`setup-quadlets`, `restart-quadlets`, `teardown-quadlets`, `status-quadlets`).
+- Plugin-API, Runtime, Image-Variante und veröffentlichten Digest abgleichen.
+- Plugin-Pins und Quelle nachvollziehbar erfassen, ohne OpenClaws Installer zu duplizieren.
+- Vollständigen Plan für Artefakte, Runtime-Konfiguration, Mounts und Neustarts liefern.
+- Abnahme: Der WhatsApp/API-Konflikt wird vor einer Installation erklärt und eine
+  überprüfte kompatible Kombination vorgeschlagen.
 
-## Phase 2
+## Priorität 2: Wiederherstellung belegen
 
-- Harden controlled `upgrade` / `rollback` flows.
-- Add host-specific override composition.
-- Add deployed-state snapshot tracking.
+- Unvollständige Sicherungen vor Migration als Fehler behandeln.
+- Secret- und Zustandsquellen explizit erfassen; Wiederherstellung pro Mitglied anbieten.
+- Upgrade-Sequenz aus der CLI in testbare Workflows extrahieren.
+- Abnahme: Restore-Probe für ein Testmitglied, einschließlich Fehler nach Migration
+  und Fehler nach Inventaränderung, ohne andere Mitglieder zurückzusetzen.
 
-### Next Steps (Phase 2 Execution Plan)
+## Priorität 3: Sicherheitsprofil durchsetzen
 
-1. Lifecycle command hardening
-- Implement stable command contracts for `setup-quadlets`, `restart-quadlets`, `teardown-quadlets`, `status-quadlets`.
-- Keep preview-first behavior where mutation is possible.
-- Add role and selector targeting semantics (single member vs full team).
-- DoD: happy-path + failure-path tests for each lifecycle command.
+- Explizite, getestete Containerregeln für Gateway und Migrationscontainer.
+- Mounts, Runtime-Sockets, Netzwerkexposition und Ressourcenbegrenzung prüfen.
+- OpenClaws eigene Policies und Audits einbeziehen; innere Sandbox separat integrieren.
+- Abnahme: Effektive Regeln sind sichtbar; Browser, Plugins und Upgrades funktionieren
+  unter dem Profil. Ausnahmen sind Teil des Plans.
 
-2. Host override composition
-- Add optional host overlay files and deterministic merge order.
-- Validate merged inventory with existing collision checks.
-- Add `plan` output that shows which values came from host overrides.
-- DoD: fixture-based tests for merge precedence and conflict errors.
+## Danach: Betrieb vereinfachen
 
-3. Deployed-state snapshot tracking
-- Persist a local state snapshot after successful mutation.
-- Track rendered digest/checksum per instance plus applied timestamp.
-- Add drift command/report comparing inventory intent vs deployed snapshot.
-- DoD: tests for snapshot write/read, missing snapshot, and drift detection.
-
-### Testing Focus For Upcoming Work
-
-- Add negative tests for malformed YAML and missing required fields.
-- Add systemd failure-path tests (`daemon-reload`/`restart` non-zero rc).
-- Add multi-host prep tests where parsing is allowed but execution is gated.
-
-## Phase 3
-
-- FastAPI + server-rendered dashboard for non-developers.
-- Read-only views first (inventory, health, version drift, pending changes).
-- Carefully gated mutating actions with confirmations and audit trail.
-
-## Phase 4
-
-- Optional remote execution (SSH or agent).
-- Multi-host orchestration primitives.
+- Status nach Dienst, Runtime, Plugin und Kanal differenzieren.
+- Drift und letzten erfolgreich angewendeten Plan erfassen.
+- Dashboard erst auf stabilen Workflows aufbauen.
+- Remote-Betrieb erst mit ausdrücklichem Transport-, Host- und Vertrauensmodell.

@@ -1,5 +1,8 @@
 # Ueber meinen Menschen
 
+Diese Datei ist versioniert. Nur abstrakte, nicht vertrauliche Praeferenzen eintragen;
+keine realen Namen, Kontakt-, Kalender-, Nachrichten-, Zugangs- oder Gesundheitsdaten.
+
 - Name / Anrede: noch festlegen
 - Zeitzone: Europe/Berlin
 - Typische aktive Zeiten: noch festlegen

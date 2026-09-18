@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, JsonValue, field_validator, model_validator
 
 
 def _project_root_from_environment(default: str = "") -> str:
@@ -35,6 +36,7 @@ class ImageSpec(BaseModel):
     tag: str
     digest: str | None = None
     known_good_digest: str | None = None
+    known_good_tag: str | None = None
 
 
 class PortSpec(BaseModel):
@@ -48,6 +50,55 @@ class MountSpec(BaseModel):
     source: str
     target: str
     read_only: bool = False
+
+
+class PluginSpec(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
+    artifact_path: str | None = None
+    sha256: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    npm_spec: str | None = None
+    integrity: str | None = Field(default=None, pattern=r"^sha512-[A-Za-z0-9+/]+={0,2}$")
+    config: dict[str, JsonValue] = Field(default_factory=dict)
+    enabled: bool = True
+    custom_ui: bool = False
+
+    @model_validator(mode="after")
+    def validate_source(self) -> PluginSpec:
+        archive_fields = (self.artifact_path, self.sha256)
+        npm_fields = (self.npm_spec, self.integrity)
+        has_archive = any(value is not None for value in archive_fields)
+        has_npm = any(value is not None for value in npm_fields)
+        if has_archive == has_npm:
+            raise ValueError(
+                "plugin must declare exactly one source: artifact_path + sha256 or "
+                "npm_spec + integrity"
+            )
+        if has_archive and not all(value is not None for value in archive_fields):
+            raise ValueError("archive plugins require artifact_path and sha256")
+        if has_npm and not all(value is not None for value in npm_fields):
+            raise ValueError("npm plugins require npm_spec and integrity")
+        if self.npm_spec and not re.fullmatch(
+            r"(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*@"
+            r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?",
+            self.npm_spec,
+        ):
+            raise ValueError("npm_spec must contain an exact package version")
+        return self
+
+    @property
+    def source_type(self) -> Literal["archive", "npm"]:
+        return "archive" if self.artifact_path is not None else "npm"
+
+    @property
+    def container_path(self) -> str:
+        return f"/opt/clawake/plugins/{self.id}.tgz"
+
+    @property
+    def install_target(self) -> str:
+        if self.source_type == "archive":
+            return self.container_path
+        assert self.npm_spec is not None
+        return f"npm:{self.npm_spec}"
 
 
 class HealthSpec(BaseModel):
@@ -66,7 +117,7 @@ class UpdatePolicy(BaseModel):
 class BackupPolicy(BaseModel):
     enabled: bool = True
     pre_mutation: bool = True
-    retention: int = 5
+    retention: int = Field(default=5, ge=1)
     paths: list[str] = Field(default_factory=list)
 
 
@@ -86,6 +137,7 @@ class DashboardMeta(BaseModel):
 
 class InstanceSpec(BaseModel):
     name: str
+    legacy_names: list[str] = Field(default_factory=list)
     host: str
     role: Literal["product_owner", "developer"]
     workspace_path: str
@@ -96,7 +148,10 @@ class InstanceSpec(BaseModel):
     image: ImageSpec
     ports: list[PortSpec] = Field(default_factory=list)
     mounts: list[MountSpec] = Field(default_factory=list)
+    plugins: list[PluginSpec] = Field(default_factory=list)
+    agent_tool_allow: dict[str, list[str]] = Field(default_factory=dict)
     env_files: list[str] = Field(default_factory=list)
+    dns_servers: list[str] = Field(default_factory=list)
     labels: dict[str, str] = Field(default_factory=dict)
     public_url: str | None = None
     health: HealthSpec = Field(default_factory=HealthSpec)
@@ -105,8 +160,46 @@ class InstanceSpec(BaseModel):
     gateway_runtime: GatewayRuntimeSpec = Field(default_factory=GatewayRuntimeSpec)
     dashboard: DashboardMeta
 
+    @field_validator("dns_servers")
+    @classmethod
+    def validate_dns_servers(cls, values: list[str]) -> list[str]:
+        for value in values:
+            try:
+                ip_address(value)
+            except ValueError as exc:
+                raise ValueError(f"DNS server must be an IPv4 or IPv6 address: '{value}'") from exc
+        return values
+
+    @field_validator("agent_tool_allow")
+    @classmethod
+    def validate_agent_tool_allow(cls, value: dict[str, list[str]]) -> dict[str, list[str]]:
+        agent_pattern = re.compile(r"^[A-Za-z0-9_.@-]+$")
+        tool_pattern = re.compile(r"^[A-Za-z0-9_.*:-]+$")
+        for agent_id, tools in value.items():
+            if not agent_pattern.fullmatch(agent_id):
+                raise ValueError(f"Invalid agent id in agent_tool_allow: '{agent_id}'")
+            if not tools or len(tools) != len(set(tools)):
+                raise ValueError(f"agent_tool_allow for '{agent_id}' must be non-empty and unique")
+            for tool in tools:
+                if not tool_pattern.fullmatch(tool):
+                    raise ValueError(f"Invalid tool id in agent_tool_allow: '{tool}'")
+        return value
+
+    @field_validator("legacy_names")
+    @classmethod
+    def validate_legacy_names(cls, values: list[str]) -> list[str]:
+        unit_name_pattern = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.@-]*$")
+        if len(values) != len(set(values)):
+            raise ValueError("legacy_names must be unique")
+        for value in values:
+            if not unit_name_pattern.fullmatch(value):
+                raise ValueError(f"Invalid legacy instance name: '{value}'")
+        return values
+
     @model_validator(mode="after")
     def ensure_backup_defaults(self) -> InstanceSpec:
+        if self.name in self.legacy_names:
+            raise ValueError(f"instances[{self.name}].legacy_names must not include its name")
         quadlet = Path(self.quadlet_path)
         if quadlet.suffix != ".container":
             raise ValueError(
@@ -217,6 +310,20 @@ class Inventory(BaseModel):
                     f"instances[{instance.name}].mounts.target",
                     mount.target,
                 )
+            plugin_ids: set[str] = set()
+            for plugin in instance.plugins:
+                if plugin.id in plugin_ids:
+                    raise ValueError(
+                        f"Instance '{instance.name}' contains duplicate plugin '{plugin.id}'"
+                    )
+                plugin_ids.add(plugin.id)
+                if plugin.artifact_path is not None:
+                    artifact = _validate_safe_absolute_path(
+                        f"instances[{instance.name}].plugins[{plugin.id}].artifact_path",
+                        plugin.artifact_path,
+                    )
+                    if not artifact.endswith(".tgz"):
+                        raise ValueError(f"Plugin artifact for '{plugin.id}' must end with '.tgz'")
 
             if instance.gateway_runtime.enabled:
                 expected = {

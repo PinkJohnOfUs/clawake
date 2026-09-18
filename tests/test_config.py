@@ -15,6 +15,56 @@ def test_load_example_inventory() -> None:
         assert instance.team_definition_path.endswith("/role")
 
 
+def test_invalid_dns_server_is_rejected(tmp_path: Path) -> None:
+    config = tmp_path / "invalid-dns.yml"
+    config.write_text(
+        """
+cluster: {name: c, primary_host: local}
+hosts: [{name: local}]
+instances:
+  - name: one
+    host: local
+    role: developer
+    workspace_path: /srv/one/workspace
+    team_definition_path: /srv/one/role
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: example.invalid/openclaw, tag: "1"}
+    dns_servers: [not-an-address]
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="DNS server must be"):
+        load_inventory(config)
+
+
+def test_legacy_name_that_could_be_a_command_option_is_rejected(tmp_path: Path) -> None:
+    config = tmp_path / "invalid-legacy-name.yml"
+    config.write_text(
+        """
+cluster: {name: c, primary_host: local}
+hosts: [{name: local}]
+instances:
+  - name: one
+    legacy_names: [--help]
+    host: local
+    role: developer
+    workspace_path: /srv/one/workspace
+    team_definition_path: /srv/one/role
+    quadlet_path: one.container
+    container_name: one
+    image: {repository: example.invalid/openclaw, tag: "1"}
+    dashboard: {friendly_name: One}
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Invalid legacy instance name"):
+        load_inventory(config)
+
+
 def test_inventory_defaults_project_root_to_repository() -> None:
     inventory = load_inventory(Path("personal-team/team.yml"))
     repository_root = Path.cwd().resolve()
@@ -22,6 +72,31 @@ def test_inventory_defaults_project_root_to_repository() -> None:
     navigator = next(item for item in inventory.instances if item.name == "alltags-navigator")
     assert navigator.workspace_path == str(repository_root / "personal-team/workspaces/navigator")
     assert navigator.team_definition_path == str(repository_root / "personal-team/roles/navigator")
+
+    pflegebetreuer = next(item for item in inventory.instances if item.name == "pflegebetreuer")
+    assert pflegebetreuer.legacy_names == ["fokus-partner"]
+    whatsapp = next(item for item in pflegebetreuer.plugins if item.id == "whatsapp")
+    assert whatsapp.source_type == "npm"
+    assert whatsapp.npm_spec == "@openclaw/whatsapp@2026.9.2"
+
+    plugin = next(item for item in pflegebetreuer.plugins if item.id == "pflege-google-limited")
+    assert plugin.id == "pflege-google-limited"
+    assert plugin.artifact_path == str(
+        repository_root / "personal-team/plugins/pflege-google-limited/releases/"
+        "pflege-google-limited-0.6.0-openclaw-2026.9.2.tgz"
+    )
+    assert plugin.container_path == "/opt/clawake/plugins/pflege-google-limited.tgz"
+
+    vault = next(item for item in pflegebetreuer.plugins if item.id == "pflege-vault")
+    assert vault.sha256 == (
+        "sha256:5ae4df070439ac2a7bcd281fe4c3f8c8d70efb41bb57a59180ecde58b5e59a9f"
+    )
+    assert vault.config["masterKey"] == {
+        "source": "store",
+        "provider": "default",
+        "id": "PFLEGE_VAULT_MASTER_KEY",
+    }
+    assert pflegebetreuer.agent_tool_allow == {"main": ["pflege_vault"]}
 
 
 def test_port_collision_validation(tmp_path: Path) -> None:

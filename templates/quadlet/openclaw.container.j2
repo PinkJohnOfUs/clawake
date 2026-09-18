@@ -2,11 +2,17 @@
 Description=OpenClaw instance {{ instance.name }}
 After=network-online.target
 Wants=network-online.target
+{% for legacy_name in instance.legacy_names %}
+Conflicts={{ legacy_name }}.service
+{% endfor %}
 
 [Container]
 ContainerName={{ instance.container_name }}
 Image={{ image_ref }}
 UserNS=keep-id:uid=1000,gid=1000
+{% if browser_image %}
+Volume={{ browser_cache_path }}:/home/node/.cache/openclaw-1000
+{% endif %}
 {% for env_file in instance.env_files %}
 EnvironmentFile={{ env_file }}
 {% endfor %}
@@ -14,8 +20,16 @@ Volume={{ instance.workspace_path }}:/workspace
 Volume={{ instance.team_definition_path }}:/team-definition:ro
 Volume={{ instance.workspace_path }}/.openclaw:/home/node/.openclaw
 Network={{ instance.network_quadlet_path }}
+{% for dns_server in instance.dns_servers %}
+DNS={{ dns_server }}
+{% endfor %}
 {% for mount in instance.mounts %}
 Volume={{ mount.source }}:{{ mount.target }}{{ ':ro' if mount.read_only else '' }}
+{% endfor %}
+{% for plugin in instance.plugins %}
+{% if plugin.source_type == 'archive' %}
+Volume={{ plugin.artifact_path }}:{{ plugin.container_path }}:ro
+{% endif %}
 {% endfor %}
 {% for port in instance.ports %}
 PublishPort={{ port.bind_address }}:{{ port.host_port }}:{{ port.container_port }}/{{ port.protocol }}
@@ -30,6 +44,9 @@ Label={{ key }}={{ value }}
 {% endfor %}
 
 [Service]
+{% for legacy_name in instance.legacy_names %}
+ExecStartPre=-/usr/bin/podman stop {{ legacy_name }}
+{% endfor %}
 Restart=always
 TimeoutStartSec=120
 

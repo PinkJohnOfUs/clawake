@@ -1,0 +1,136 @@
+{
+  "id": "pflege-vault",
+  "name": "Pflege Vault",
+  "description": "Purpose-bound encrypted key/value storage for the Pflegebetreuer agent.",
+  "version": "0.1.0",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["pflege_vault"]
+  },
+  "toolMetadata": {
+    "pflege_vault": {
+      "optional": true
+    }
+  },
+  "configContracts": {
+    "secretInputs": {
+      "bundledDefaultEnabled": false,
+      "paths": [
+        {
+          "path": "masterKey",
+          "expected": "string",
+          "ownerKind": "capability"
+        },
+        {
+          "path": "previousKeys.*.key",
+          "expected": "string",
+          "ownerKind": "capability"
+        }
+      ]
+    }
+  },
+  "uiHints": {
+    "vaultPath": {
+      "label": "Ciphertext-Datei",
+      "help": "Absoluter Pfad auf einem persistenten Volume außerhalb des Agent-Workspace."
+    },
+    "allowedAgentId": {
+      "label": "Pflegebetreuer-Agent-ID",
+      "help": "Exakte OpenClaw-Agent-ID, die das Tool verwenden darf."
+    },
+    "activeKeyVersion": {
+      "label": "Aktive Schlüsselversion"
+    },
+    "masterKey": {
+      "label": "Aktiver AES-256-Schlüssel",
+      "help": "Nur als OpenClaw SecretRef; Base64-kodiert, exakt 32 Byte.",
+      "sensitive": true
+    },
+    "previousKeys.*.key": {
+      "label": "Vorheriger AES-256-Schlüssel",
+      "help": "Nur während einer Rotation als OpenClaw SecretRef behalten.",
+      "sensitive": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "$defs": {
+      "secretRef": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "const": "store"
+          },
+          "provider": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+          }
+        },
+        "required": ["source", "provider", "id"]
+      },
+      "secretInput": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "$ref": "#/$defs/secretRef"
+          }
+        ]
+      },
+      "previousKey": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "key": {
+            "$ref": "#/$defs/secretInput"
+          }
+        },
+        "required": ["version", "key"]
+      }
+    },
+    "properties": {
+      "vaultPath": {
+        "type": "string",
+        "minLength": 2
+      },
+      "allowedAgentId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "activeKeyVersion": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2147483647
+      },
+      "masterKey": {
+        "$ref": "#/$defs/secretInput"
+      },
+      "previousKeys": {
+        "type": "array",
+        "maxItems": 8,
+        "items": {
+          "$ref": "#/$defs/previousKey"
+        },
+        "default": []
+      }
+    },
+    "required": ["vaultPath", "allowedAgentId", "activeKeyVersion", "masterKey"]
+  }
+}

@@ -17,8 +17,10 @@ instances:
     container_name: alltags-navigator
     image:
       repository: ghcr.io/openclaw/openclaw
-      tag: "2026.7.1-2"
-      digest: sha256:f56744f2cbd2c2477c739158fbc4cf594300aa535767a87da3bcd9cafa150160
+      tag: "2026.8.2-browser"
+      digest: sha256:e164a318801fad2d49dc19b99adadfa629fa5f9ffb43673e73661c1d3f9cc7de
+      known_good_tag: "2026.8.2"
+      known_good_digest: sha256:5d25165995041caa6a7175bec82b25ad98c44eb269bb42435da8e27ec06e6be4
     ports:
       - bind_address: 127.0.0.1
         host_port: 18789
@@ -55,8 +57,8 @@ instances:
     container_name: reflexions-coach
     image:
       repository: ghcr.io/openclaw/openclaw
-      tag: "2026.7.1-2"
-      digest: sha256:f56744f2cbd2c2477c739158fbc4cf594300aa535767a87da3bcd9cafa150160
+      tag: "2026.8.2"
+      digest: sha256:5d25165995041caa6a7175bec82b25ad98c44eb269bb42435da8e27ec06e6be4
     ports:
       - bind_address: 127.0.0.1
         host_port: 18889
@@ -84,17 +86,21 @@ instances:
       description: Coacht wertschatzend und motiviert ohne Druck
       tags: [coaching, reflexion, motivation]
 
-  - name: fokus-partner
+  - name: pflegebetreuer
+    legacy_names:
+      - fokus-partner
     host: local
     role: developer
-    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/fokus
-    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/fokus
-    quadlet_path: fokus-partner.container
-    container_name: fokus-partner
+    workspace_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/workspaces/pflegebetreuer
+    team_definition_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/roles/pflegebetreuer
+    quadlet_path: pflegebetreuer.container
+    container_name: pflegebetreuer
     image:
       repository: ghcr.io/openclaw/openclaw
-      tag: "2026.7.1-2"
-      digest: sha256:f56744f2cbd2c2477c739158fbc4cf594300aa535767a87da3bcd9cafa150160
+      tag: "2026.9.2-browser"
+      digest: sha256:f57ec52faf5e92da835ababa3b9ffd5fc820496f5c79247e483a9a4e46f51293
+      known_good_tag: "2026.8.2-browser"
+      known_good_digest: sha256:e164a318801fad2d49dc19b99adadfa629fa5f9ffb43673e73661c1d3f9cc7de
     ports:
       - bind_address: 127.0.0.1
         host_port: 18989
@@ -105,7 +111,43 @@ instances:
         container_port: 18790
         protocol: tcp
     env_files:
-      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/fokus.env
+      - ${CLAWAKE_PROJECT_ROOT}/personal-team/env/pflegebetreuer.env
+    # The host uses systemd-resolved's loopback stub, which aardvark-dns cannot
+    # forward reliably from its network namespace. Use the LAN resolver directly.
+    dns_servers:
+      - 192.168.2.1
+    plugins:
+      - id: whatsapp
+        npm_spec: "@openclaw/whatsapp@2026.9.2"
+        integrity: sha512-vOWQIk7FpLHrhMmO+FaLi+pnFB82hiWNJJFJONkBuofERh2SMEz7EMut/vECFFEjFnmOZSVlYfRlxhbNkd/R6g==
+        enabled: true
+      - id: pflege-google-limited
+        artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-google-limited/releases/pflege-google-limited-0.6.0-openclaw-2026.9.2.tgz
+        sha256: sha256:f38bb31ac096b10f58b95ae62e8db1f492ded7e8870a1391de41439c7e3b3597
+        enabled: true
+        custom_ui: true
+        config:
+          credentialsPath: /home/node/.openclaw/secrets/pflege-google-web-credentials.json
+          tokenPath: /home/node/.openclaw/secrets/pflege-google-web-token.json
+          publicOrigin: http://127.0.0.1:18989
+          downloadDirectory: /home/node/.openclaw/downloads
+          maxDownloadBytes: 26214400
+      - id: pflege-vault
+        artifact_path: ${CLAWAKE_PROJECT_ROOT}/personal-team/plugins/pflege-vault/releases/pflege-vault-0.1.0-openclaw-2026.9.2.tgz
+        sha256: sha256:5ae4df070439ac2a7bcd281fe4c3f8c8d70efb41bb57a59180ecde58b5e59a9f
+        enabled: true
+        config:
+          vaultPath: /home/node/.openclaw/pflege-vault/vault.json
+          allowedAgentId: main
+          activeKeyVersion: 1
+          masterKey:
+            source: store
+            provider: default
+            id: PFLEGE_VAULT_MASTER_KEY
+          previousKeys: []
+    agent_tool_allow:
+      main:
+        - pflege_vault
     labels:
       env: personal
       audience: private
