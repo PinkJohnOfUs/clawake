@@ -187,8 +187,10 @@ def ensure_plugin_runtime_config(instance: InstanceSpec) -> tuple[Path, bool]:
             raise ValueError(f"Clawake state '{state_path}': invalid agent tool grant")
         key = grant.get("key")
         old_tools = grant.get("tools")
-        if key not in {"allow", "alsoAllow"} or not isinstance(old_tools, list) or not all(
-            isinstance(item, str) for item in old_tools
+        if (
+            key not in {"allow", "alsoAllow"}
+            or not isinstance(old_tools, list)
+            or not all(isinstance(item, str) for item in old_tools)
         ):
             raise ValueError(f"Clawake state '{state_path}': invalid grant for agent '{agent_id}'")
         agent = agent_entries.get(agent_id)

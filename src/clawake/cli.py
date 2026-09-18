@@ -216,19 +216,15 @@ def _retire_legacy_services(
             typer.echo(f"Retiring legacy service {legacy_name}.service for {instance.name}")
             stop_result = service.stop(legacy_name, execute=True)
             _print_result(stop_result)
-            if (
-                stop_result.return_code != 0
-                and not _is_tolerated_teardown_error(stop_result)
-            ):
+            if stop_result.return_code != 0 and not _is_tolerated_teardown_error(stop_result):
                 failed = True
                 continue
 
             if disable:
                 disable_result = service.disable(legacy_name, execute=True)
                 _print_result(disable_result)
-                if (
-                    disable_result.return_code != 0
-                    and not _is_tolerated_teardown_error(disable_result)
+                if disable_result.return_code != 0 and not _is_tolerated_teardown_error(
+                    disable_result
                 ):
                     failed = True
                     continue
@@ -240,13 +236,10 @@ def _retire_legacy_services(
                     f"{legacy_name}.network",
                     f"{legacy_name}-state.volume",
                 ):
-                    remove_result = service.remove_quadlet(
-                        str(root / artifact), execute=True
-                    )
+                    remove_result = service.remove_quadlet(str(root / artifact), execute=True)
                     _print_result(remove_result)
-                    if (
-                        remove_result.return_code != 0
-                        and not _is_tolerated_teardown_error(remove_result)
+                    if remove_result.return_code != 0 and not _is_tolerated_teardown_error(
+                        remove_result
                     ):
                         failed = True
     return not failed
@@ -555,9 +548,7 @@ def setup_quadlets(
     service = SystemdService()
     failed = False
 
-    quadlet_roots = {
-        host.name: Path(host.quadlet_root).expanduser() for host in inventory.hosts
-    }
+    quadlet_roots = {host.name: Path(host.quadlet_root).expanduser() for host in inventory.hosts}
     if not _retire_legacy_services(
         service,
         selected,
